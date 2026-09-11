@@ -7,7 +7,39 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app">
+    <div class="main-menu" id="mainMenu">
+      <div class="menu-card">
+        <div class="menu-logo">
+          <span>NEON</span>
+          <strong>RIDGE DEFENSE</strong>
+        </div>
+        <p class="menu-subtitle">Бесконечная защита ядра в неоновом мире</p>
+
+        <div class="menu-section">
+          <h2>Выберите карту</h2>
+          <div class="map-list" id="mapList">
+            <button class="map-card active" data-map="ridge">
+              <span class="map-preview ridge-preview"></span>
+              <span><b>Неоновый хребет</b><small>Базовый маршрут</small></span>
+            </button>
+            <button class="map-card" data-map="circuit">
+              <span class="map-preview circuit-preview"></span>
+              <span><b>Кибер-контур</b><small>Много поворотов</small></span>
+            </button>
+            <button class="map-card" data-map="coreline">
+              <span class="map-preview coreline-preview"></span>
+              <span><b>Ядровая линия</b><small>Открытая трасса</small></span>
+            </button>
+          </div>
+          <p class="selected-map">Карта: <strong id="selectedMapName">Неоновый хребет</strong></p>
+        </div>
+
+        <button id="startGameBtn" class="menu-start primary">Начать игру</button>
+        <p class="menu-tip">Совет: нажмите на выбранную башню справа ещё раз, чтобы снять её выбор.</p>
+      </div>
+    </div>
+
+    <div class="app hidden" id="gameScreen">
       <header class="topbar">
         <div>
           <h1>Neon Ridge Defense</h1>
@@ -15,7 +47,7 @@
         <div class="status-strip" aria-label="Статистика">
           <div><span id="money">170 ◈</span><small>осколки</small></div>
           <div><span id="lives">24</span><small>ядро</small></div>
-          <div><span id="wave">0/16</span><small>волна</small></div>
+          <div><span id="wave">0 ∞</span><small>волна</small></div>
           <div><span id="kills">0</span><small>сбито</small></div>
         </div>
       </header>
@@ -87,14 +119,16 @@
               <p>Башня: Импульс</p>
               <p>Стоимость: 55 ◈</p>
             </div>
-            <div class="action-grid">
-              <button id="upgradeBtn" class="primary" disabled>Улучшить</button>
+            <div class="action-grid upgrade-grid">
+              <button id="upgradeBtn" class="primary" disabled>Урон +</button>
+              <button id="rangeBtn" disabled>Радиус +</button>
+              <button id="speedBtnUpgrade" disabled>Скорость +</button>
               <button id="sellBtn" disabled>Продать</button>
             </div>
           </section>
 
           <section class="panel-section">
-            <h2>Волны</h2>
+            <h2>Бесконечные волны</h2>
             <div class="wave-card">
               <div>
                 <span id="waveName">Готовность</span>
@@ -106,6 +140,7 @@
               <button id="pauseBtn">Пауза</button>
               <button id="speedBtn">x1</button>
             </div>
+            <button id="menuBtn" class="menu-back">← Главное меню</button>
           </section>
         </aside>
       </main>

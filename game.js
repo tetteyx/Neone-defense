@@ -11,6 +11,8 @@ const towerList = document.getElementById("towerList");
 const selectionInfo = document.getElementById("selectionInfo");
 
 const upgradeBtn = document.getElementById("upgradeBtn");
+const rangeBtn = document.getElementById("rangeBtn");
+const speedBtnUpgrade = document.getElementById("speedBtnUpgrade");
 const sellBtn = document.getElementById("sellBtn");
 
 const waveNameEl = document.getElementById("waveName");
@@ -24,6 +26,12 @@ const endModal = document.getElementById("endModal");
 const endTitle = document.getElementById("endTitle");
 const endText = document.getElementById("endText");
 const restartBtn = document.getElementById("restartBtn");
+const mainMenu = document.getElementById("mainMenu");
+const gameScreen = document.getElementById("gameScreen");
+const startGameBtn = document.getElementById("startGameBtn");
+const menuBtn = document.getElementById("menuBtn");
+const mapList = document.getElementById("mapList");
+const selectedMapNameEl = document.getElementById("selectedMapName");
 
 
 /* =========================================================
@@ -102,7 +110,7 @@ const state = {
   lives: 24,
 
   wave: 0,
-  maxWaves: 16,
+  maxWaves: Infinity,
 
   kills: 0,
 
@@ -113,6 +121,9 @@ const state = {
 
   selectedType: "pulse",
   selectedTower: null,
+  previewX: 0,
+  previewY: 0,
+  previewValid: false,
 
   waveActive: false,
   spawning: false,
@@ -133,18 +144,57 @@ const state = {
    ДОРОГА
 ========================================================= */
 
-const path = [
-  { x: -40, y: 120 },
-  { x: 150, y: 120 },
-  { x: 150, y: 250 },
-  { x: 350, y: 250 },
-  { x: 350, y: 110 },
-  { x: 560, y: 110 },
-  { x: 560, y: 390 },
-  { x: 790, y: 390 },
-  { x: 790, y: 220 },
-  { x: 1040, y: 220 }
-];
+const maps = {
+  ridge: {
+    name: "Неоновый хребет",
+    description: "Базовый маршрут с длинными прямыми участками.",
+    path: [
+      { x: -40, y: 120 },
+      { x: 150, y: 120 },
+      { x: 150, y: 250 },
+      { x: 350, y: 250 },
+      { x: 350, y: 110 },
+      { x: 560, y: 110 },
+      { x: 560, y: 390 },
+      { x: 790, y: 390 },
+      { x: 790, y: 220 },
+      { x: 1040, y: 220 }
+    ]
+  },
+  circuit: {
+    name: "Кибер-контур",
+    description: "Извилистая трасса с большим количеством поворотов.",
+    path: [
+      { x: -40, y: 500 },
+      { x: 140, y: 500 },
+      { x: 140, y: 150 },
+      { x: 330, y: 150 },
+      { x: 330, y: 430 },
+      { x: 520, y: 430 },
+      { x: 520, y: 180 },
+      { x: 720, y: 180 },
+      { x: 720, y: 500 },
+      { x: 1040, y: 500 }
+    ]
+  },
+  coreline: {
+    name: "Ядровая линия",
+    description: "Открытая карта с длинным центральным маршрутом.",
+    path: [
+      { x: -40, y: 320 },
+      { x: 180, y: 320 },
+      { x: 180, y: 120 },
+      { x: 430, y: 120 },
+      { x: 430, y: 500 },
+      { x: 680, y: 500 },
+      { x: 680, y: 300 },
+      { x: 1040, y: 300 }
+    ]
+  }
+};
+
+let currentMap = "ridge";
+let path = maps[currentMap].path;
 
 
 /* =========================================================
@@ -242,6 +292,10 @@ function towerAt(x, y) {
 }
 
 function canPlaceTower(x, y) {
+  if (!state.selectedType || !towerTypes[state.selectedType]) {
+    return false;
+  }
+
   if (x < 30 || x > GAME_WIDTH - 30) {
     return false;
   }
@@ -287,6 +341,9 @@ function placeSelectedTower(x, y) {
     type: state.selectedType,
 
     level: 1,
+    damageLevel: 1,
+    rangeLevel: 1,
+    speedLevel: 1,
 
     damage: type.damage,
     range: type.range,
@@ -316,17 +373,31 @@ function placeSelectedTower(x, y) {
 
 function getTowerStats(tower) {
   const base = towerTypes[tower.type];
-
-  const multiplier = 1 + (tower.level - 1) * 0.35;
+  const damageLevel = tower.damageLevel || 1;
+  const rangeLevel = tower.rangeLevel || 1;
+  const speedLevel = tower.speedLevel || 1;
 
   return {
-    damage: Math.round(base.damage * multiplier),
-    range: base.range + (tower.level - 1) * 15,
+    damage: Math.round(
+        base.damage * (1 + (damageLevel - 1) * 0.35)
+    ),
+    range: base.range + (rangeLevel - 1) * 15,
     fireRate: Math.max(
-        0.18,
-        base.fireRate * Math.pow(0.92, tower.level - 1)
+        0.12,
+        base.fireRate * Math.pow(0.92, speedLevel - 1)
     )
   };
+}
+
+function getUpgradeCost(tower, kind) {
+  const baseCost = towerTypes[tower.type].cost;
+  const level = tower[`${kind}Level`] || 1;
+  const multipliers = {
+    damage: 0.42,
+    range: 0.34,
+    speed: 0.48
+  };
+  return Math.floor(baseCost * (0.75 + level * multipliers[kind]));
 }
 
 
@@ -715,11 +786,6 @@ function startWave() {
     return;
   }
 
-  if (state.wave >= state.maxWaves) {
-    endGame(true);
-    return;
-  }
-
   state.wave++;
 
   state.waveActive = true;
@@ -781,20 +847,16 @@ function updateWave(dt) {
   ) {
     state.waveActive = false;
 
-    if (state.wave >= state.maxWaves) {
-      endGame(true);
-    } else {
-      state.money += 25;
+    state.money += 25 + Math.floor(state.wave * 2.5);
 
-      waveNameEl.textContent =
-          "Готовность";
+    waveNameEl.textContent =
+        "Готовность";
 
-      setHint(
-          "Волна завершена. Можно улучшить башни или начать следующую."
-      );
+    setHint(
+        `Волна ${state.wave} завершена. Можно улучшить башни или начать следующую.`
+    );
 
-      updateUi();
-    }
+    updateUi();
   }
 }
 
@@ -803,37 +865,36 @@ function updateWave(dt) {
    УЛУЧШЕНИЕ
 ========================================================= */
 
-function upgradeSelectedTower() {
+function upgradeTowerStat(kind) {
   const tower = state.selectedTower;
-
-  if (!tower) {
+  if (!tower || !['damage', 'range', 'speed'].includes(kind)) {
     return;
   }
 
-  const cost =
-      Math.floor(
-          towerTypes[tower.type].cost *
-          (0.65 + tower.level * 0.45)
-      );
-
+  const cost = getUpgradeCost(tower, kind);
   if (state.money < cost) {
-    setHint(
-        "Недостаточно осколков для улучшения."
-    );
+    setHint("Недостаточно осколков для улучшения.");
     return;
   }
 
   state.money -= cost;
-
-  tower.level++;
-
+  tower[`${kind}Level`] = (tower[`${kind}Level`] || 1) + 1;
   tower.totalSpent += cost;
 
-  setHint(
-      `${towerTypes[tower.type].name} улучшена до уровня ${tower.level}.`
-  );
+  const names = {
+    damage: 'урон',
+    range: 'радиус',
+    speed: 'скорость атаки'
+  };
 
+  setHint(
+      `${towerTypes[tower.type].name}: ${names[kind]} улучшен до уровня ${tower[`${kind}Level`]}.`
+  );
   updateUi();
+}
+
+function upgradeSelectedTower() {
+  upgradeTowerStat('damage');
 }
 
 function sellSelectedTower() {
@@ -879,7 +940,7 @@ function updateUi() {
       Math.max(0, state.lives);
 
   waveEl.textContent =
-      `${state.wave}/${state.maxWaves}`;
+      `${state.wave} ∞`;
 
   killsEl.textContent =
       state.kills;
@@ -894,34 +955,46 @@ function updateUi() {
     const stats =
         getTowerStats(tower);
 
-    const upgradeCost =
-        Math.floor(
-            type.cost *
-            (0.65 + tower.level * 0.45)
-        );
+    const damageCost = getUpgradeCost(tower, 'damage');
+    const rangeCost = getUpgradeCost(tower, 'range');
+    const speedCost = getUpgradeCost(tower, 'speed');
 
     selectionInfo.innerHTML = `
             <p>Башня: ${type.name}</p>
-            <p>Уровень: ${tower.level}</p>
-            <p>Урон: ${stats.damage}</p>
-            <p>Дальность: ${Math.round(stats.range)}</p>
-            <p>Улучшение: ${upgradeCost} ◈</p>
+            <p>Урон: ${stats.damage} · ур. ${tower.damageLevel || 1}</p>
+            <p>Радиус: ${Math.round(stats.range)} · ур. ${tower.rangeLevel || 1}</p>
+            <p>Скорость атаки: ${stats.fireRate.toFixed(2)}с · ур. ${tower.speedLevel || 1}</p>
         `;
 
-    upgradeBtn.disabled =
-        state.money < upgradeCost;
+    upgradeBtn.textContent = `Урон + (${damageCost} ◈)`;
+    rangeBtn.textContent = `Радиус + (${rangeCost} ◈)`;
+    speedBtnUpgrade.textContent = `Скорость + (${speedCost} ◈)`;
 
+    upgradeBtn.disabled = state.money < damageCost;
+    rangeBtn.disabled = state.money < rangeCost;
+    speedBtnUpgrade.disabled = state.money < speedCost;
     sellBtn.disabled = false;
   } else {
-    const type =
-        towerTypes[state.selectedType];
+    const type = state.selectedType
+        ? towerTypes[state.selectedType]
+        : null;
 
-    selectionInfo.innerHTML = `
+    selectionInfo.innerHTML = type
+        ? `
             <p>Башня: ${type.name}</p>
             <p>Стоимость: ${type.cost} ◈</p>
-        `;
+          `
+        : `
+            <p>Башня не выбрана</p>
+            <p>Выберите башню справа для установки.</p>
+          `;
 
+    upgradeBtn.textContent = "Урон +";
+    rangeBtn.textContent = "Радиус +";
+    speedBtnUpgrade.textContent = "Скорость +";
     upgradeBtn.disabled = true;
+    rangeBtn.disabled = true;
+    speedBtnUpgrade.disabled = true;
     sellBtn.disabled = true;
   }
 
@@ -944,9 +1017,7 @@ function updateUi() {
     startWaveBtn.disabled = true;
   } else {
     enemyCountEl.textContent =
-        state.wave >= state.maxWaves
-            ? "Все волны пройдены"
-            : "Нажмите старт";
+        "Нажмите старт для следующей бесконечной волны";
 
     startWaveBtn.disabled =
         state.gameOver;
@@ -1039,6 +1110,17 @@ canvas.addEventListener(
 );
 
 
+canvas.addEventListener("mousemove", (event) => {
+  const p = canvasPoint(event);
+  state.previewX = p.x;
+  state.previewY = p.y;
+  state.previewValid = !!state.selectedType && canPlaceTower(p.x, p.y);
+});
+
+canvas.addEventListener("mouseleave", () => {
+  state.previewValid = false;
+});
+
 /* =========================================================
    ВЫБОР ТИПА БАШНИ
 ========================================================= */
@@ -1062,9 +1144,15 @@ towerList.addEventListener(
         return;
       }
 
-      state.selectedType = type;
+      const wasSelected = state.selectedType === type;
 
       state.selectedTower = null;
+
+      if (wasSelected) {
+        state.selectedType = null;
+      } else {
+        state.selectedType = type;
+      }
 
       document
           .querySelectorAll(
@@ -1073,13 +1161,20 @@ towerList.addEventListener(
           .forEach(card => {
             card.classList.toggle(
                 "active",
-                card === button
+                !wasSelected && card === button
             );
           });
 
-      setHint(
-          `${towerTypes[type].name}: выберите место вне дороги.`
-      );
+      if (wasSelected) {
+        state.previewValid = false;
+        setHint(
+            "Выбор башни снят. Теперь ни одна башня не выбрана."
+        );
+      } else {
+        setHint(
+            `${towerTypes[type].name}: выберите место вне дороги.`
+        );
+      }
 
       updateUi();
     }
@@ -1092,7 +1187,17 @@ towerList.addEventListener(
 
 upgradeBtn.addEventListener(
     "click",
-    upgradeSelectedTower
+    () => upgradeTowerStat('damage')
+);
+
+rangeBtn.addEventListener(
+    "click",
+    () => upgradeTowerStat('range')
+);
+
+speedBtnUpgrade.addEventListener(
+    "click",
+    () => upgradeTowerStat('speed')
 );
 
 sellBtn.addEventListener(
@@ -1139,9 +1244,28 @@ speedBtn.addEventListener(
     }
 );
 
+startGameBtn.addEventListener(
+    "click",
+    startGame
+);
+
+menuBtn.addEventListener(
+    "click",
+    showMainMenu
+);
+
+mapList.addEventListener(
+    "click",
+    event => {
+      const button = event.target.closest(".map-card");
+      if (!button) return;
+      selectMap(button.dataset.map);
+    }
+);
+
 restartBtn.addEventListener(
     "click",
-    restartGame
+    startGame
 );
 
 
@@ -1809,6 +1933,46 @@ function drawEffects() {
 
 
 /* =========================================================
+   ПРЕДПРОСМОТР УСТАНОВКИ
+========================================================= */
+
+function drawPlacementPreview() {
+  if (state.selectedTower || !state.previewValid && !state.previewX && !state.previewY) {
+    return;
+  }
+
+  const type = towerTypes[state.selectedType];
+  if (!type) return;
+
+  const x = state.previewX;
+  const y = state.previewY;
+  const valid = canPlaceTower(x, y);
+  const alpha = valid ? 0.5 : 0.18;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = type.color;
+  ctx.strokeStyle = valid ? type.color : "#ff5577";
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.arc(x, y, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.08;
+  ctx.beginPath();
+  ctx.arc(x, y, type.range, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = valid ? type.color : "#ff5577";
+  ctx.beginPath();
+  ctx.arc(x, y, type.range, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* =========================================================
    ОТРИСОВКА
 ========================================================= */
 
@@ -1838,6 +2002,7 @@ function draw() {
     drawProjectile(projectile);
   }
 
+  drawPlacementPreview();
   drawEffects();
 }
 
@@ -1953,6 +2118,42 @@ function endGame(win) {
   );
 }
 
+function selectMap(mapId) {
+  if (!maps[mapId]) {
+    return;
+  }
+
+  currentMap = mapId;
+  path = maps[mapId].path;
+
+  document
+      .querySelectorAll(".map-card")
+      .forEach(card => {
+        card.classList.toggle(
+            "active",
+            card.dataset.map === mapId
+        );
+      });
+
+  if (selectedMapNameEl) {
+    selectedMapNameEl.textContent = maps[mapId].name;
+  }
+}
+
+function showMainMenu() {
+  state.paused = true;
+  gameScreen.classList.add("hidden");
+  mainMenu.classList.remove("hidden");
+}
+
+function startGame() {
+  restartGame();
+  state.paused = false;
+  state.lastTime = performance.now();
+  mainMenu.classList.add("hidden");
+  gameScreen.classList.remove("hidden");
+}
+
 function restartGame() {
   state.money = 170;
   state.lives = 24;
@@ -1967,6 +2168,8 @@ function restartGame() {
 
   state.selectedType =
       "pulse";
+
+  path = maps[currentMap].path;
 
   state.selectedTower =
       null;
@@ -2023,11 +2226,17 @@ function restartGame() {
    ЗАПУСК
 ========================================================= */
 
+selectMap(currentMap);
+
 setHint(
     "Выберите башню справа, затем поставьте ее вне светящейся дороги."
 );
 
 updateUi();
+
+// Главное меню открывается при запуске.
+gameScreen.classList.add("hidden");
+mainMenu.classList.remove("hidden");
 
 requestAnimationFrame(
     gameLoop
