@@ -18,20 +18,185 @@ const sellBtn = document.getElementById("sellBtn");
 const waveNameEl = document.getElementById("waveName");
 const enemyCountEl = document.getElementById("enemyCount");
 
-const startWaveBtn = document.getElementById("startWaveBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 const speedBtn = document.getElementById("speedBtn");
+const fullscreenBtn = document.getElementById("fullscreenBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsPanel = document.getElementById("settingsPanel");
+const settingsWidget = document.getElementById("settingsWidget");
+const volumeSlider = document.getElementById("volumeSlider");
+const volumeValue = document.getElementById("volumeValue");
+const pauseOverlay = document.getElementById("pauseOverlay");
+const resumeBtn = document.getElementById("resumeBtn");
 
 const endModal = document.getElementById("endModal");
 const endTitle = document.getElementById("endTitle");
 const endText = document.getElementById("endText");
 const restartBtn = document.getElementById("restartBtn");
+const endMenuBtn = document.getElementById("endMenuBtn");
 const mainMenu = document.getElementById("mainMenu");
 const gameScreen = document.getElementById("gameScreen");
 const startGameBtn = document.getElementById("startGameBtn");
 const menuBtn = document.getElementById("menuBtn");
+const nextWaveBtn = document.getElementById("nextWaveBtn");
+const newGameBtn = document.getElementById("newGameBtn");
 const mapList = document.getElementById("mapList");
 const selectedMapNameEl = document.getElementById("selectedMapName");
+const difficultyList = document.getElementById("difficultyList");
+const selectedDifficultyNameEl = document.getElementById("selectedDifficultyName");
+
+/* =========================================================
+   САУНД-ДИЗАЙН
+========================================================= */
+
+let audioContext = null;
+let audioMaster = null;
+const VOLUME_KEY = "neonBridgeDefenseVolume_v1";
+let audioVolume = 0.55;
+
+try {
+  const storedVolume = Number(localStorage.getItem(VOLUME_KEY));
+  if (Number.isFinite(storedVolume)) {
+    audioVolume = Math.max(0, Math.min(1, storedVolume));
+  }
+} catch (error) {
+  // Используем значение по умолчанию.
+}
+
+function applyAudioVolume() {
+  if (audioMaster) {
+    audioMaster.gain.value = 0.055 * audioVolume;
+  }
+  if (volumeSlider) {
+    volumeSlider.value = String(Math.round(audioVolume * 100));
+  }
+  if (volumeValue) {
+    volumeValue.textContent = `${Math.round(audioVolume * 100)}%`;
+  }
+}
+
+function ensureAudio() {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioMaster = audioContext.createGain();
+      audioMaster.gain.value = 0.055 * audioVolume;
+      audioMaster.connect(audioContext.destination);
+      applyAudioVolume();
+    }
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+  } catch (error) {
+    // Игра продолжает работать и без Web Audio API.
+  }
+}
+
+function playShotSound(type) {
+  if (!audioContext || !audioMaster) {
+    return;
+  }
+
+  const frequencies = {
+    pulse: 520,
+    rail: 150,
+    frost: 720,
+    blast: 105,
+    arc: 880,
+    singularity: 55
+  };
+
+  const frequency = frequencies[type] || 420;
+  const now = audioContext.currentTime;
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const filter = audioContext.createBiquadFilter();
+
+  oscillator.type = type === "rail" || type === "blast" ? "sawtooth" : "triangle";
+  oscillator.frequency.setValueAtTime(frequency, now);
+  oscillator.frequency.exponentialRampToValueAtTime(
+      Math.max(55, frequency * 0.55),
+      now + 0.075
+  );
+
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(2200, now);
+  filter.frequency.exponentialRampToValueAtTime(700, now + 0.075);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.42, now + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.085);
+
+  oscillator.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioMaster);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.09);
+}
+
+function playDefeatSound() {
+  if (!audioContext || !audioMaster) {
+    return;
+  }
+
+  const now = audioContext.currentTime;
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const filter = audioContext.createBiquadFilter();
+
+  oscillator.type = "sawtooth";
+  oscillator.frequency.setValueAtTime(220, now);
+  oscillator.frequency.exponentialRampToValueAtTime(72, now + 0.65);
+
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(1200, now);
+  filter.frequency.exponentialRampToValueAtTime(260, now + 0.65);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.55, now + 0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+
+  oscillator.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioMaster);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.72);
+}
+
+
+function playLeakSound() {
+  if (!audioContext || !audioMaster) {
+    return;
+  }
+
+  const now = audioContext.currentTime;
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const filter = audioContext.createBiquadFilter();
+
+  oscillator.type = "square";
+  oscillator.frequency.setValueAtTime(180, now);
+  oscillator.frequency.exponentialRampToValueAtTime(82, now + 0.22);
+
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(900, now);
+  filter.frequency.exponentialRampToValueAtTime(320, now + 0.22);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.34, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+
+  oscillator.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioMaster);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.26);
+}
 
 
 /* =========================================================
@@ -43,6 +208,8 @@ const GAME_HEIGHT = 640;
 
 canvas.width = GAME_WIDTH;
 canvas.height = GAME_HEIGHT;
+
+const MAX_UPGRADE_LEVEL = 5;
 
 const towerTypes = {
   pulse: {
@@ -97,6 +264,17 @@ const towerTypes = {
     color: "#ffe66d",
     projectileSpeed: 650,
     chain: 2
+  },
+
+  singularity: {
+    name: "Нуль-коллайдер",
+    cost: 100000,
+    damage: 25000,
+    range: 300,
+    fireRate: 4.5,
+    color: "#ff4dff",
+    projectileSpeed: 520,
+    splash: 105
   }
 };
 
@@ -107,7 +285,7 @@ const towerTypes = {
 
 const state = {
   money: 170,
-  lives: 24,
+  lives: 12,
 
   wave: 0,
   maxWaves: Infinity,
@@ -119,7 +297,7 @@ const state = {
   projectiles: [],
   effects: [],
 
-  selectedType: "pulse",
+  selectedType: null,
   selectedTower: null,
   previewX: 0,
   previewY: 0,
@@ -130,6 +308,9 @@ const state = {
   spawnTimer: 0,
   enemiesToSpawn: 0,
   enemiesSpawned: 0,
+  nextWaveTimer: 1.25,
+  queuedWaves: 0,
+  activeWaves: [],
 
   paused: false,
   speed: 1,
@@ -146,7 +327,7 @@ const state = {
 
 const maps = {
   ridge: {
-    name: "Неоновый хребет",
+    name: "Неоновый мост",
     description: "Базовый маршрут с длинными прямыми участками.",
     path: [
       { x: -40, y: 120 },
@@ -178,7 +359,7 @@ const maps = {
     ]
   },
   coreline: {
-    name: "Ядровая линия",
+    name: "Жизненная линия",
     description: "Открытая карта с длинным центральным маршрутом.",
     path: [
       { x: -40, y: 320 },
@@ -317,6 +498,15 @@ function canPlaceTower(x, y) {
   return true;
 }
 
+function clearTowerTypeSelection() {
+  state.selectedType = null;
+  state.previewValid = false;
+
+  document.querySelectorAll(".tower-card").forEach((card) => {
+    card.classList.remove("active");
+  });
+}
+
 function placeSelectedTower(x, y) {
   const type = towerTypes[state.selectedType];
 
@@ -325,12 +515,18 @@ function placeSelectedTower(x, y) {
   }
 
   if (state.money < type.cost) {
-    setHint("Недостаточно осколков.");
+    clearTowerTypeSelection();
+    state.selectedTower = null;
+    setHint("Недостаточно долларов. Выбор башни снят.");
+    updateUi();
     return;
   }
 
   if (!canPlaceTower(x, y)) {
-    setHint("Здесь нельзя поставить башню.");
+    clearTowerTypeSelection();
+    state.selectedTower = null;
+    setHint("Здесь нельзя поставить башню. Выбор башни снят.");
+    updateUi();
     return;
   }
 
@@ -357,10 +553,14 @@ function placeSelectedTower(x, y) {
   state.money -= type.cost;
 
   state.towers.push(tower);
-  state.selectedTower = tower;
+
+  // После установки выбор типа башни полностью снимается.
+  // Чтобы поставить следующую башню, нужно снова нажать её карточку.
+  state.selectedTower = null;
+  clearTowerTypeSelection();
 
   setHint(
-      `${type.name} установлена. Нажмите на неё ещё раз, чтобы снять выделение.`
+      `${type.name} установлена. Выберите башню заново для следующей установки.`
   );
 
   updateUi();
@@ -392,11 +592,17 @@ function getTowerStats(tower) {
 function getUpgradeCost(tower, kind) {
   const baseCost = towerTypes[tower.type].cost;
   const level = tower[`${kind}Level`] || 1;
+
+  if (level >= MAX_UPGRADE_LEVEL) {
+    return Infinity;
+  }
+
   const multipliers = {
     damage: 0.42,
     range: 0.34,
     speed: 0.48
   };
+
   return Math.floor(baseCost * (0.75 + level * multipliers[kind]));
 }
 
@@ -443,31 +649,78 @@ function totalPathLength() {
   return result;
 }
 
-const PATH_LENGTH = totalPathLength();
+let PATH_LENGTH = totalPathLength();
 
-function spawnEnemy() {
-  const wave = state.wave;
+const difficulties = {
+  easy: {
+    name: "Легкий",
+    hpMultiplier: 0.78,
+    speedMultiplier: 0.90,
+    countMultiplier: 0.88,
+    rewardMultiplier: 1.18,
+    waveRewardMultiplier: 1.15
+  },
+  normal: {
+    name: "Средний",
+    hpMultiplier: 1.00,
+    speedMultiplier: 1.00,
+    countMultiplier: 1.00,
+    rewardMultiplier: 1.00,
+    waveRewardMultiplier: 1.00
+  },
+  hard: {
+    name: "Сложный",
+    hpMultiplier: 1.30,
+    speedMultiplier: 1.10,
+    countMultiplier: 1.14,
+    rewardMultiplier: 0.88,
+    waveRewardMultiplier: 0.90
+  }
+};
 
-  const maxHp = 70 + wave * 22;
+let currentDifficulty = "easy";
+
+function getDifficulty() {
+  return difficulties[currentDifficulty] || difficulties.normal;
+}
+
+function getWaveScaling(wave) {
+  const w = Math.max(1, wave);
+  const difficulty = getDifficulty();
+
+  const hpGrowth = Math.pow(1 + 0.085 * (w - 1), 1.12);
+  const speedGrowth = Math.min(2.15, 1 + 0.0105 * (w - 1));
+  const rewardGrowth = Math.pow(1 + 0.040 * (w - 1), 0.92);
+  const countGrowth =
+      6 +
+      Math.floor(2.35 * Math.sqrt(w - 1)) +
+      Math.floor((w - 1) * 0.07);
+
+  return {
+    hp: Math.max(1, 70 * hpGrowth * difficulty.hpMultiplier),
+    speed: 45 * speedGrowth * difficulty.speedMultiplier,
+    reward: Math.max(1, 7 * rewardGrowth * difficulty.rewardMultiplier),
+    count: Math.max(4, Math.round(countGrowth * difficulty.countMultiplier)),
+    spawnInterval: Math.max(0.25, 0.72 - Math.min(0.38, (w - 1) * 0.0038))
+  };
+}
+
+function spawnEnemy(waveNumber = state.wave) {
+  const scaling = getWaveScaling(waveNumber);
+  const maxHp = Math.round(scaling.hp);
 
   const enemy = {
+    waveNumber,
     distance: 0,
-
     x: path[0].x,
     y: path[0].y,
-
     hp: maxHp,
     maxHp,
-
-    speed: 45 + wave * 2.5,
-
+    speed: scaling.speed,
     radius: 13,
-
-    reward: 7 + Math.floor(wave * 1.5),
-
+    reward: Math.max(1, Math.round(scaling.reward)),
     slowMultiplier: 1,
     slowTimer: 0,
-
     dead: false
   };
 
@@ -499,6 +752,8 @@ function updateEnemy(enemy, dt) {
     enemy.dead = true;
 
     state.lives--;
+    ensureAudio();
+    playLeakSound();
 
     createExplosion(
         enemy.x,
@@ -661,6 +916,12 @@ function killEnemy(enemy) {
 
   state.money += enemy.reward;
 
+  createCashPopup(
+      enemy.x,
+      enemy.y - 10,
+      enemy.reward
+  );
+
   createExplosion(
       enemy.x,
       enemy.y,
@@ -723,6 +984,8 @@ function updateTowers(dt) {
         target
     );
 
+    playShotSound(tower.type);
+
     const stats = getTowerStats(tower);
 
     tower.cooldown = stats.fireRate;
@@ -759,6 +1022,18 @@ function createLightning(a, b) {
   });
 }
 
+function createCashPopup(x, y, amount) {
+  state.effects.push({
+    type: "cash",
+    x,
+    y,
+    amount,
+    life: 0.9,
+    maxLife: 0.9,
+    velocityY: -28
+  });
+}
+
 function updateEffects(dt) {
   for (const effect of state.effects) {
     effect.life -= dt;
@@ -767,6 +1042,11 @@ function updateEffects(dt) {
       effect.radius +=
           (effect.maxRadius / effect.maxLife) *
           dt;
+    }
+
+    if (effect.type === "cash") {
+      effect.y += effect.velocityY * dt;
+      effect.velocityY += 12 * dt;
     }
   }
 
@@ -782,81 +1062,109 @@ function updateEffects(dt) {
 ========================================================= */
 
 function startWave() {
-  if (state.waveActive || state.gameOver) {
+  if (state.gameOver) {
     return;
   }
 
   state.wave++;
+  const waveNumber = state.wave;
+  const scaling = getWaveScaling(waveNumber);
+
+  state.activeWaves.push({
+    waveNumber,
+    spawning: true,
+    spawnTimer: 0,
+    enemiesToSpawn: scaling.count,
+    enemiesSpawned: 0
+  });
 
   state.waveActive = true;
   state.spawning = true;
-
-  state.enemiesSpawned = 0;
-
-  state.enemiesToSpawn =
-      5 + state.wave * 2;
-
-  state.spawnTimer = 0;
+  state.nextWaveTimer = 2.25;
 
   waveNameEl.textContent =
-      `Волна ${state.wave}`;
+      state.activeWaves.length > 1
+          ? `Волны ${state.activeWaves.map(w => w.waveNumber).join(' + ')}`
+          : `Волна ${waveNumber}`;
 
   setHint(
-      `Волна ${state.wave} началась.`
+      state.activeWaves.length > 1
+          ? `Запущена дополнительная волна ${waveNumber} параллельно текущей.`
+          : `Волна ${waveNumber} началась.`
   );
 
   updateUi();
 }
 
 function updateWave(dt) {
-  if (!state.waveActive) {
+  if (state.gameOver) {
     return;
   }
 
-  if (state.spawning) {
-    state.spawnTimer -= dt;
+  if (state.activeWaves.length === 0) {
+    state.waveActive = false;
+    state.spawning = false;
+    state.nextWaveTimer -= dt;
+    if (state.nextWaveTimer <= 0) {
+      startWave();
+    }
+    return;
+  }
 
-    if (
-        state.spawnTimer <= 0 &&
-        state.enemiesSpawned <
-        state.enemiesToSpawn
-    ) {
-      spawnEnemy();
-
-      state.enemiesSpawned++;
-
-      state.spawnTimer = 0.75;
+  for (const wave of state.activeWaves) {
+    if (!wave.spawning) {
+      continue;
     }
 
-    if (
-        state.enemiesSpawned >=
-        state.enemiesToSpawn
-    ) {
-      state.spawning = false;
+    wave.spawnTimer -= dt;
+
+    if (wave.spawnTimer <= 0 && wave.enemiesSpawned < wave.enemiesToSpawn) {
+      spawnEnemy(wave.waveNumber);
+      wave.enemiesSpawned++;
+      wave.spawnTimer = getWaveScaling(wave.waveNumber).spawnInterval;
+    }
+
+    if (wave.enemiesSpawned >= wave.enemiesToSpawn) {
+      wave.spawning = false;
     }
   }
 
-  const aliveEnemies =
-      state.enemies.filter(
-          enemy => !enemy.dead
-      ).length;
-
-  if (
-      !state.spawning &&
-      aliveEnemies === 0
-  ) {
-    state.waveActive = false;
-
-    state.money += 25 + Math.floor(state.wave * 2.5);
-
-    waveNameEl.textContent =
-        "Готовность";
-
-    setHint(
-        `Волна ${state.wave} завершена. Можно улучшить башни или начать следующую.`
+  // Удаляем только те волны, для которых уже вышли все мобы и не осталось
+  // живых врагов именно этой волны. Другие запущенные волны продолжаются.
+  const completed = [];
+  state.activeWaves = state.activeWaves.filter(wave => {
+    const spawning = wave.spawning;
+    const alive = state.enemies.some(enemy =>
+        !enemy.dead && enemy.waveNumber === wave.waveNumber
     );
 
-    updateUi();
+    if (!spawning && !alive) {
+      completed.push(wave.waveNumber);
+      const reward = Math.round(
+          (25 + Math.floor(wave.waveNumber * 2.5)) *
+          getDifficulty().waveRewardMultiplier
+      );
+      state.money += reward;
+      return false;
+    }
+    return true;
+  });
+
+  state.waveActive = state.activeWaves.length > 0;
+  state.spawning = state.activeWaves.some(wave => wave.spawning);
+
+  if (completed.length > 0) {
+    const label = completed.length === 1
+        ? `Волна ${completed[0]} завершена.`
+        : `Завершены волны: ${completed.join(', ')}.`;
+
+    if (state.waveActive) {
+      setHint(`${label} Остальные запущенные волны продолжаются.`);
+    } else {
+      state.nextWaveTimer = 2.25;
+      waveNameEl.textContent = 'Готовность';
+      setHint(`${label} Следующая волна начнётся автоматически.`);
+    }
   }
 }
 
@@ -871,9 +1179,15 @@ function upgradeTowerStat(kind) {
     return;
   }
 
+  const currentLevel = tower[`${kind}Level`] || 1;
+  if (currentLevel >= MAX_UPGRADE_LEVEL) {
+    setHint(`${towerTypes[tower.type].name}: этот параметр уже на максимуме.`);
+    return;
+  }
+
   const cost = getUpgradeCost(tower, kind);
   if (state.money < cost) {
-    setHint("Недостаточно осколков для улучшения.");
+    setHint("Недостаточно долларов для улучшения.");
     return;
   }
 
@@ -921,7 +1235,7 @@ function sellSelectedTower() {
   state.money += refund;
 
   setHint(
-      `Башня продана за ${refund} ◈.`
+      `Башня продана за $${refund}.`
   );
 
   updateUi();
@@ -934,7 +1248,7 @@ function sellSelectedTower() {
 
 function updateUi() {
   moneyEl.textContent =
-      `${Math.floor(state.money)} ◈`;
+      `$${Math.floor(state.money)}`;
 
   livesEl.textContent =
       Math.max(0, state.lives);
@@ -966,13 +1280,13 @@ function updateUi() {
             <p>Скорость атаки: ${stats.fireRate.toFixed(2)}с · ур. ${tower.speedLevel || 1}</p>
         `;
 
-    upgradeBtn.textContent = `Урон + (${damageCost} ◈)`;
-    rangeBtn.textContent = `Радиус + (${rangeCost} ◈)`;
-    speedBtnUpgrade.textContent = `Скорость + (${speedCost} ◈)`;
+    upgradeBtn.textContent = damageCost === Infinity ? "Урон MAX" : `Урон + ($${damageCost})`;
+    rangeBtn.textContent = rangeCost === Infinity ? "Радиус MAX" : `Радиус + ($${rangeCost})`;
+    speedBtnUpgrade.textContent = speedCost === Infinity ? "Скорость MAX" : `Скорость + ($${speedCost})`;
 
-    upgradeBtn.disabled = state.money < damageCost;
-    rangeBtn.disabled = state.money < rangeCost;
-    speedBtnUpgrade.disabled = state.money < speedCost;
+    upgradeBtn.disabled = damageCost === Infinity || state.money < damageCost;
+    rangeBtn.disabled = rangeCost === Infinity || state.money < rangeCost;
+    speedBtnUpgrade.disabled = speedCost === Infinity || state.money < speedCost;
     sellBtn.disabled = false;
   } else {
     const type = state.selectedType
@@ -982,7 +1296,7 @@ function updateUi() {
     selectionInfo.innerHTML = type
         ? `
             <p>Башня: ${type.name}</p>
-            <p>Стоимость: ${type.cost} ◈</p>
+            <p>Стоимость: $${type.cost}</p>
           `
         : `
             <p>Башня не выбрана</p>
@@ -999,28 +1313,26 @@ function updateUi() {
   }
 
   if (state.waveActive) {
-    const remaining =
-        state.enemiesToSpawn -
-        state.enemiesSpawned;
-
-    const alive =
-        state.enemies.filter(
-            enemy => !enemy.dead
-        ).length;
+    const spawningLeft = state.activeWaves.reduce(
+        (sum, wave) => sum + Math.max(0, wave.enemiesToSpawn - wave.enemiesSpawned),
+        0
+    );
+    const alive = state.enemies.filter(enemy => !enemy.dead).length;
 
     enemyCountEl.textContent =
-        `Осталось: ${Math.max(
-            0,
-            remaining + alive
-        )}`;
-
-    startWaveBtn.disabled = true;
+        `Активных волн: ${state.activeWaves.length} · мобов: ${spawningLeft + alive}`;
   } else {
-    enemyCountEl.textContent =
-        "Нажмите старт для следующей бесконечной волны";
+    const seconds = Math.max(0, Math.ceil(state.nextWaveTimer));
+    enemyCountEl.textContent = state.gameOver
+        ? "Волны остановлены"
+        : `Следующая волна через ${seconds}с`;
+  }
 
-    startWaveBtn.disabled =
-        state.gameOver;
+  if (nextWaveBtn) {
+    nextWaveBtn.textContent = state.waveActive
+        ? `Запустить ещё одну волну`
+        : "Запустить волну";
+    nextWaveBtn.disabled = state.gameOver;
   }
 }
 
@@ -1187,17 +1499,26 @@ towerList.addEventListener(
 
 upgradeBtn.addEventListener(
     "click",
-    () => upgradeTowerStat('damage')
+    () => {
+      ensureAudio();
+      upgradeTowerStat('damage');
+    }
 );
 
 rangeBtn.addEventListener(
     "click",
-    () => upgradeTowerStat('range')
+    () => {
+      ensureAudio();
+      upgradeTowerStat('range');
+    }
 );
 
 speedBtnUpgrade.addEventListener(
     "click",
-    () => upgradeTowerStat('speed')
+    () => {
+      ensureAudio();
+      upgradeTowerStat('speed');
+    }
 );
 
 sellBtn.addEventListener(
@@ -1205,28 +1526,53 @@ sellBtn.addEventListener(
     sellSelectedTower
 );
 
-startWaveBtn.addEventListener(
-    "click",
-    startWave
-);
+function queueNextWave() {
+  if (state.gameOver) {
+    return;
+  }
+
+  ensureAudio();
+  // Важно: это НЕ очередь. Каждый клик немедленно создаёт новую волну,
+  // которая идёт параллельно уже запущенным.
+  startWave();
+  updateUi();
+}
+
+
+function setPaused(paused) {
+  state.paused = paused;
+
+  pauseBtn.textContent =
+      state.paused
+          ? "Продолжить"
+          : "Пауза";
+
+  if (pauseOverlay) {
+    pauseOverlay.classList.toggle("hidden", !state.paused);
+  }
+
+  if (!state.paused) {
+    state.lastTime = performance.now();
+  }
+}
 
 pauseBtn.addEventListener(
     "click",
     () => {
-      state.paused =
-          !state.paused;
-
-      pauseBtn.textContent =
-          state.paused
-              ? "Продолжить"
-              : "Пауза";
-
-      if (!state.paused) {
-        state.lastTime =
-            performance.now();
-      }
+      ensureAudio();
+      setPaused(!state.paused);
     }
 );
+
+if (resumeBtn) {
+  resumeBtn.addEventListener(
+      "click",
+      () => {
+        ensureAudio();
+        setPaused(false);
+      }
+  );
+}
 
 speedBtn.addEventListener(
     "click",
@@ -1249,10 +1595,97 @@ startGameBtn.addEventListener(
     startGame
 );
 
+if (volumeSlider) {
+  applyAudioVolume();
+  volumeSlider.addEventListener("input", () => {
+    audioVolume = Number(volumeSlider.value) / 100;
+    applyAudioVolume();
+    try {
+      localStorage.setItem(VOLUME_KEY, String(audioVolume));
+    } catch (error) {
+      // Настройка громкости остаётся рабочей и без localStorage.
+    }
+  });
+}
+
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (error) {
+    setHint("Полноэкранный режим недоступен в этом браузере.");
+  }
+}
+
+function closeSettings() {
+  if (!settingsPanel || !settingsBtn) return;
+  settingsPanel.classList.add("hidden");
+  settingsBtn.setAttribute("aria-expanded", "false");
+}
+
+function toggleSettings() {
+  if (!settingsPanel || !settingsBtn) return;
+  const isOpen = !settingsPanel.classList.contains("hidden");
+  settingsPanel.classList.toggle("hidden", isOpen);
+  settingsBtn.setAttribute("aria-expanded", String(!isOpen));
+}
+
+if (settingsBtn) {
+  settingsBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    ensureAudio();
+    toggleSettings();
+  });
+}
+
+if (settingsPanel) {
+  settingsPanel.addEventListener("click", (event) => event.stopPropagation());
+}
+
+document.addEventListener("click", (event) => {
+  if (settingsWidget && !settingsWidget.contains(event.target)) {
+    closeSettings();
+  }
+});
+
+if (fullscreenBtn) {
+  fullscreenBtn.addEventListener("click", () => {
+    ensureAudio();
+    toggleFullscreen();
+    closeSettings();
+  });
+}
+
+document.addEventListener("fullscreenchange", () => {
+  if (fullscreenBtn) {
+    fullscreenBtn.textContent = document.fullscreenElement
+        ? "Выйти из полного экрана"
+        : "Весь экран";
+  }
+});
+
+if (nextWaveBtn) {
+  nextWaveBtn.addEventListener("click", queueNextWave);
+}
+
 menuBtn.addEventListener(
     "click",
     showMainMenu
 );
+
+if (difficultyList) {
+  difficultyList.addEventListener(
+      "click",
+      event => {
+        const button = event.target.closest(".difficulty-card");
+        if (!button) return;
+        selectDifficulty(button.dataset.difficulty);
+      }
+  );
+}
 
 mapList.addEventListener(
     "click",
@@ -1265,8 +1698,27 @@ mapList.addEventListener(
 
 restartBtn.addEventListener(
     "click",
-    startGame
+    startNewGame
 );
+
+if (endMenuBtn) {
+  endMenuBtn.addEventListener("click", () => {
+    ensureAudio();
+    endModal.classList.add("hidden");
+    showMainMenu();
+  });
+}
+
+if (newGameBtn) {
+  newGameBtn.addEventListener("click", startNewGame);
+}
+
+window.addEventListener("beforeunload", () => {
+  // Сохраняем именно активную игру при закрытии/обновлении страницы.
+  if (!state.gameOver && !gameScreen.classList.contains("hidden")) {
+    saveGame();
+  }
+});
 
 
 /* =========================================================
@@ -1522,35 +1974,7 @@ function drawTower(tower) {
   const stats =
       getTowerStats(tower);
 
-  /*
-   * Радиус действия выделенной башни.
-   */
-  if (selected) {
-    ctx.save();
-
-    ctx.fillStyle =
-        `${type.color}12`;
-
-    ctx.strokeStyle =
-        `${type.color}55`;
-
-    ctx.lineWidth = 2;
-
-    ctx.beginPath();
-
-    ctx.arc(
-        tower.x,
-        tower.y,
-        stats.range,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.restore();
-  }
+  drawTowerUpgradeVisual(tower, type);
 
   /*
    * Свечение.
@@ -1637,6 +2061,20 @@ function drawTower(tower) {
 
     ctx.fill();
     ctx.stroke();
+  } else if (tower.type === "singularity") {
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 13, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = type.color;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 5, 0, Math.PI * 2);
+    ctx.fill();
   } else if (tower.type === "arc") {
     ctx.beginPath();
 
@@ -1677,7 +2115,7 @@ function drawTower(tower) {
   ctx.shadowBlur = 0;
 
   /*
-   * Центральное ядро.
+   * Центральная точка жизней.
    */
   ctx.fillStyle =
       type.color;
@@ -1696,24 +2134,8 @@ function drawTower(tower) {
 
   ctx.restore();
 
-  /*
-   * Уровень.
-   */
-  if (tower.level > 1) {
-    ctx.fillStyle =
-        "#ffffff";
 
-    ctx.font =
-        "bold 11px Arial";
 
-    ctx.textAlign = "center";
-
-    ctx.fillText(
-        `L${tower.level}`,
-        tower.x,
-        tower.y + 36
-    );
-  }
 }
 
 
@@ -1927,10 +2349,116 @@ function drawEffects() {
       ctx.stroke();
     }
 
+    if (effect.type === "place") {
+      ctx.globalAlpha = Math.max(0, effect.life / effect.maxLife);
+      const progress = 1 - effect.life / effect.maxLife;
+      ctx.strokeStyle = effect.color || "#63e6ff";
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 18; ctx.shadowColor = effect.color || "#63e6ff";
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, 10 + progress * 30, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    if (effect.type === "cash") {
+      ctx.globalAlpha = alpha;
+      ctx.font = "800 16px Inter, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#ffd36a";
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ffb52e";
+      ctx.fillText(`+$${effect.amount}`, effect.x, effect.y);
+    }
+
     ctx.restore();
   }
 }
 
+
+function drawTowerUpgradeVisual(tower, type) {
+  const damageLevel = tower.damageLevel || 1;
+  const rangeLevel = tower.rangeLevel || 1;
+  const speedLevel = tower.speedLevel || 1;
+  const levels = [damageLevel, rangeLevel, speedLevel];
+  const colors = ["#ff4055", "#ffd43b", "#35d9ff"];
+  const selected = tower === state.selectedTower;
+  const allMax = levels.every(level => level >= MAX_UPGRADE_LEVEL);
+
+  ctx.save();
+
+  // Цвета находятся внутри корпуса самой башни, а не на радиусе атаки.
+  ctx.globalCompositeOperation = "source-atop";
+
+  if (allMax) {
+    const greenGlow = ctx.createRadialGradient(
+        tower.x, tower.y, 2,
+        tower.x, tower.y, 25
+    );
+    greenGlow.addColorStop(0, "rgba(90, 255, 130, 0.95)");
+    greenGlow.addColorStop(0.55, "rgba(40, 220, 100, 0.72)");
+    greenGlow.addColorStop(1, "rgba(40, 220, 100, 0)");
+
+    ctx.fillStyle = greenGlow;
+    ctx.fillRect(tower.x - 25, tower.y - 25, 50, 50);
+  } else {
+    const offsets = [
+      [-9, 4],
+      [0, -9],
+      [9, 4]
+    ];
+
+    levels.forEach((level, index) => {
+      const progress = (level - 1) / (MAX_UPGRADE_LEVEL - 1);
+      if (progress <= 0) {
+        return;
+      }
+      const [ox, oy] = offsets[index];
+      const gradient = ctx.createRadialGradient(
+          tower.x + ox, tower.y + oy, 1,
+          tower.x + ox, tower.y + oy, 18
+      );
+
+      gradient.addColorStop(0, `${colors[index]}${Math.round(85 + progress * 115).toString(16).padStart(2, "0")}`);
+      gradient.addColorStop(0.5, `${colors[index]}55`);
+      gradient.addColorStop(1, `${colors[index]}00`);
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(tower.x - 25, tower.y - 25, 50, 50);
+    });
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+
+  // Три маленьких энергетических индикатора встроены в корпус.
+  if (!allMax) {
+    levels.forEach((level, index) => {
+      const angle = [-2.5, -Math.PI / 2, -0.64][index];
+      const distanceFromCenter = 13;
+      const x = tower.x + Math.cos(angle) * distanceFromCenter;
+      const y = tower.y + Math.sin(angle) * distanceFromCenter;
+      const progress = clamp(level / MAX_UPGRADE_LEVEL, 0.2, 1);
+
+      ctx.shadowBlur = selected ? 10 : 6;
+      ctx.shadowColor = colors[index];
+      ctx.fillStyle = colors[index];
+      ctx.globalAlpha = 0.35 + progress * 0.65;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.2 + progress * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  } else {
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#5cff8d";
+    ctx.fillStyle = "#5cff8d";
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
 
 /* =========================================================
    ПРЕДПРОСМОТР УСТАНОВКИ
@@ -2106,16 +2634,41 @@ function endGame(win) {
     endText.textContent =
         `Все ${state.maxWaves} волн уничтожены. Сбито врагов: ${state.kills}.`;
   } else {
+    ensureAudio();
+    playDefeatSound();
+
     endTitle.textContent =
         "Игра окончена";
 
     endText.textContent =
-        `Ядро уничтожено. Сбито врагов: ${state.kills}.`;
+        `Жизни закончились. Сбито врагов: ${state.kills}.`;
   }
 
   endModal.classList.remove(
       "hidden"
   );
+}
+
+function selectDifficulty(difficultyId) {
+  if (!difficulties[difficultyId]) {
+    return;
+  }
+
+  currentDifficulty = difficultyId;
+
+  document
+      .querySelectorAll(".difficulty-card")
+      .forEach(card => {
+        card.classList.toggle(
+            "active",
+            card.dataset.difficulty === difficultyId
+        );
+      });
+
+  if (selectedDifficultyNameEl) {
+    selectedDifficultyNameEl.textContent =
+        difficulties[difficultyId].name;
+  }
 }
 
 function selectMap(mapId) {
@@ -2125,6 +2678,7 @@ function selectMap(mapId) {
 
   currentMap = mapId;
   path = maps[mapId].path;
+  PATH_LENGTH = totalPathLength();
 
   document
       .querySelectorAll(".map-card")
@@ -2140,14 +2694,202 @@ function selectMap(mapId) {
   }
 }
 
+const SAVE_KEY = "neonBridgeDefenseSave_v5";
+const LEGACY_SAVE_KEYS = [
+  "neonBridgeDefenseSave_v4",
+  "neonBridgeDefenseSave_v3"
+];
+let hasStartedGame = false;
+
+// Старое сохранение предыдущей версии не считается активным прогрессом.
+// Это важно для первого запуска новой версии: «Продолжить игру» не появляется
+// только потому, что браузер сохранил тестовое состояние старой версии.
+try {
+  for (const legacyKey of LEGACY_SAVE_KEYS) {
+    localStorage.removeItem(legacyKey);
+  }
+} catch (error) {
+  // LocalStorage может быть недоступен — игра продолжает работать.
+}
+
+function hasSavedGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) {
+      return false;
+    }
+
+    const save = JSON.parse(raw);
+
+    // Сохранением считается только реально созданный во время игры
+    // файл. Пустое состояние меню никогда не даёт кнопку «Продолжить».
+    return !!(
+      save &&
+      save.version === 5 &&
+      save.startedByUser === true &&
+      save.sessionId
+    );
+  } catch (error) {
+    return false;
+  }
+}
+
+function saveGame() {
+  // Не создаём сохранение, пока пользователь ни разу не запускал игру.
+  // Это позволяет показывать «Начать игру» при первом входе в меню.
+  if (!hasStartedGame) {
+    return false;
+  }
+
+  try {
+    const save = {
+      version: 5,
+      startedByUser: true,
+      sessionId: hasStartedGame ? (state.sessionId || "active") : "active",
+      money: state.money,
+      lives: state.lives,
+      wave: state.wave,
+      kills: state.kills,
+      towers: state.towers,
+      enemies: state.enemies,
+      waveActive: state.waveActive,
+      spawning: state.spawning,
+      spawnTimer: state.spawnTimer,
+      enemiesToSpawn: state.enemiesToSpawn,
+      enemiesSpawned: state.enemiesSpawned,
+      nextWaveTimer: state.nextWaveTimer,
+      queuedWaves: 0,
+      activeWaves: state.activeWaves.map(wave => ({ ...wave })),
+      speed: state.speed,
+      currentMap,
+      currentDifficulty
+    };
+
+    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    updateResumeButton();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function clearSavedGame() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (error) {
+    // LocalStorage может быть недоступен — игра всё равно работает.
+  }
+  updateResumeButton();
+}
+
+function updateResumeButton() {
+  const exists = hasSavedGame();
+  if (exists) {
+    startGameBtn.textContent = "Продолжить игру";
+    newGameBtn?.classList.remove("hidden");
+  } else {
+    startGameBtn.textContent = "Новая игра";
+    newGameBtn?.classList.add("hidden");
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+
+    const save = JSON.parse(raw);
+    if (
+      !save ||
+      save.version !== 5 ||
+      save.startedByUser !== true ||
+      !save.sessionId
+    ) {
+      return false;
+    }
+
+    currentMap = maps[save.currentMap] ? save.currentMap : "ridge";
+    currentDifficulty = difficulties[save.currentDifficulty] ? save.currentDifficulty : "normal";
+    path = maps[currentMap].path;
+    PATH_LENGTH = totalPathLength();
+
+    state.money = Number.isFinite(save.money) ? save.money : 170;
+    state.lives = Number.isFinite(save.lives) ? save.lives : 12;
+    state.wave = Number.isFinite(save.wave) ? save.wave : 0;
+    state.kills = Number.isFinite(save.kills) ? save.kills : 0;
+    state.towers = Array.isArray(save.towers) ? save.towers : [];
+    state.enemies = Array.isArray(save.enemies) ? save.enemies : [];
+    state.projectiles = [];
+    state.effects = [];
+    state.waveActive = !!save.waveActive;
+    state.spawning = !!save.spawning;
+    state.spawnTimer = Number.isFinite(save.spawnTimer) ? save.spawnTimer : 0;
+    state.enemiesToSpawn = Number.isFinite(save.enemiesToSpawn) ? save.enemiesToSpawn : 0;
+    state.enemiesSpawned = Number.isFinite(save.enemiesSpawned) ? save.enemiesSpawned : 0;
+    state.nextWaveTimer = Number.isFinite(save.nextWaveTimer) ? save.nextWaveTimer : 2.25;
+    state.queuedWaves = Number.isFinite(save.queuedWaves) ? clamp(save.queuedWaves, 0, 9) : 0;
+    state.speed = [1, 2, 3].includes(save.speed) ? save.speed : 1;
+    state.sessionId = save.sessionId;
+    state.selectedType = "pulse";
+    state.selectedTower = null;
+    state.previewValid = false;
+    state.paused = false;
+    state.gameOver = false;
+
+    selectDifficulty(currentDifficulty);
+    selectMap(currentMap);
+    speedBtn.textContent = `x${state.speed}`;
+    pauseBtn.textContent = "Пауза";
+    pauseOverlay?.classList.add("hidden");
+    endModal.classList.add("hidden");
+    document.querySelectorAll(".tower-card").forEach(card => {
+      card.classList.toggle("active", card.dataset.tower === "pulse");
+    });
+    waveNameEl.textContent = state.waveActive ? `Волна ${state.wave}` : "Готовность";
+    hasStartedGame = true;
+    setHint("Прогресс восстановлен. Игра продолжается.");
+    updateUi();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 function showMainMenu() {
+  if (!state.gameOver) {
+    saveGame();
+  }
   state.paused = true;
+  endModal.classList.add("hidden");
   gameScreen.classList.add("hidden");
   mainMenu.classList.remove("hidden");
+  updateResumeButton();
 }
 
 function startGame() {
+  ensureAudio();
+  if (hasSavedGame()) {
+    if (!loadGame()) {
+      clearSavedGame();
+      restartGame();
+    }
+  } else {
+    restartGame();
+    state.sessionId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+  hasStartedGame = true;
+  state.paused = false;
+  state.lastTime = performance.now();
+  mainMenu.classList.add("hidden");
+  gameScreen.classList.remove("hidden");
+}
+
+function startNewGame() {
+  ensureAudio();
+  clearSavedGame();
   restartGame();
+  state.sessionId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  hasStartedGame = true;
   state.paused = false;
   state.lastTime = performance.now();
   mainMenu.classList.add("hidden");
@@ -2155,8 +2897,9 @@ function startGame() {
 }
 
 function restartGame() {
+  state.sessionId = state.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   state.money = 170;
-  state.lives = 24;
+  state.lives = 12;
 
   state.wave = 0;
   state.kills = 0;
@@ -2170,6 +2913,7 @@ function restartGame() {
       "pulse";
 
   path = maps[currentMap].path;
+  PATH_LENGTH = totalPathLength();
 
   state.selectedTower =
       null;
@@ -2183,6 +2927,9 @@ function restartGame() {
   state.spawnTimer = 0;
   state.enemiesToSpawn = 0;
   state.enemiesSpawned = 0;
+  state.nextWaveTimer = 1.25;
+  state.activeWaves = [];
+  state.queuedWaves = 0;
 
   state.paused = false;
   state.speed = 1;
@@ -2191,6 +2938,10 @@ function restartGame() {
 
   pauseBtn.textContent =
       "Пауза";
+
+  if (pauseOverlay) {
+    pauseOverlay.classList.add("hidden");
+  }
 
   speedBtn.textContent =
       "x1";
@@ -2215,7 +2966,7 @@ function restartGame() {
       "Готовность";
 
   setHint(
-      "Выберите башню справа, затем поставьте ее вне светящейся дороги."
+      "Выберите башню справа, затем поставьте её вне дороги."
   );
 
   updateUi();
@@ -2226,10 +2977,11 @@ function restartGame() {
    ЗАПУСК
 ========================================================= */
 
+selectDifficulty(currentDifficulty);
 selectMap(currentMap);
 
 setHint(
-    "Выберите башню справа, затем поставьте ее вне светящейся дороги."
+    "Выберите башню справа, затем поставьте её вне дороги."
 );
 
 updateUi();
@@ -2237,6 +2989,7 @@ updateUi();
 // Главное меню открывается при запуске.
 gameScreen.classList.add("hidden");
 mainMenu.classList.remove("hidden");
+updateResumeButton();
 
 requestAnimationFrame(
     gameLoop

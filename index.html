@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Neon Ridge Defense</title>
+    <title>Neon Bridge Defense</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -11,16 +11,35 @@
       <div class="menu-card">
         <div class="menu-logo">
           <span>NEON</span>
-          <strong>RIDGE DEFENSE</strong>
+          <strong>BRIDGE DEFENSE</strong>
         </div>
-        <p class="menu-subtitle">Бесконечная защита ядра в неоновом мире</p>
+        <p class="menu-subtitle">Бесконечная защита жизни в неоновом мире</p>
+
+        <div class="menu-section">
+          <h2>Выберите сложность</h2>
+          <div class="difficulty-list" id="difficultyList">
+            <button class="difficulty-card active" data-difficulty="easy">
+              <span class="difficulty-icon">I</span>
+              <span><b>Легкий</b><small>Мобы слабее, больше наград</small></span>
+            </button>
+            <button class="difficulty-card" data-difficulty="normal">
+              <span class="difficulty-icon">II</span>
+              <span><b>Средний</b><small>Сбалансированный режим</small></span>
+            </button>
+            <button class="difficulty-card" data-difficulty="hard">
+              <span class="difficulty-icon">III</span>
+              <span><b>Сложный</b><small>Мобы сильнее, меньше наград</small></span>
+            </button>
+          </div>
+          <p class="selected-difficulty">Сложность: <strong id="selectedDifficultyName">Легкий</strong></p>
+        </div>
 
         <div class="menu-section">
           <h2>Выберите карту</h2>
           <div class="map-list" id="mapList">
             <button class="map-card active" data-map="ridge">
               <span class="map-preview ridge-preview"></span>
-              <span><b>Неоновый хребет</b><small>Базовый маршрут</small></span>
+              <span><b>Неоновый мост</b><small>Базовый маршрут</small></span>
             </button>
             <button class="map-card" data-map="circuit">
               <span class="map-preview circuit-preview"></span>
@@ -28,13 +47,14 @@
             </button>
             <button class="map-card" data-map="coreline">
               <span class="map-preview coreline-preview"></span>
-              <span><b>Ядровая линия</b><small>Открытая трасса</small></span>
+              <span><b>Жизненная линия</b><small>Открытая трасса</small></span>
             </button>
           </div>
-          <p class="selected-map">Карта: <strong id="selectedMapName">Неоновый хребет</strong></p>
+          <p class="selected-map">Карта: <strong id="selectedMapName">Неоновый мост</strong></p>
         </div>
 
-        <button id="startGameBtn" class="menu-start primary">Начать игру</button>
+        <button id="startGameBtn" class="menu-start primary">Новая игра</button>
+        <button id="newGameBtn" class="menu-new hidden">Новая игра</button>
         <p class="menu-tip">Совет: нажмите на выбранную башню справа ещё раз, чтобы снять её выбор.</p>
       </div>
     </div>
@@ -42,11 +62,11 @@
     <div class="app hidden" id="gameScreen">
       <header class="topbar">
         <div>
-          <h1>Neon Ridge Defense</h1>
+          <h1>Neon Bridge Defense</h1>
         </div>
         <div class="status-strip" aria-label="Статистика">
-          <div><span id="money">170 ◈</span><small>осколки</small></div>
-          <div><span id="lives">24</span><small>ядро</small></div>
+          <div class="cash-status"><span id="money">$170</span><small>CASH</small></div>
+          <div class="lives-status"><span id="lives">12</span><small>LIVES</small></div>
           <div><span id="wave">0 ∞</span><small>волна</small></div>
           <div><span id="kills">0</span><small>сбито</small></div>
         </div>
@@ -56,7 +76,7 @@
         <section class="arena-wrap" aria-label="Игровое поле">
           <canvas id="game" width="1000" height="640"></canvas>
           <div class="hint-bar" id="hint">
-            Выберите башню справа, затем поставьте ее вне светящейся дороги.
+            Выберите башню справа, затем поставьте её вне дороги.
           </div>
         </section>
 
@@ -72,7 +92,7 @@
                   <circle class="icon-fill" cx="20" cy="20" r="3" />
                 </svg>
                 <span class="tower-copy"><b>Импульс</b><span>быстро стреляет</span></span>
-                <strong>55 ◈</strong>
+                <strong><span class="cash-price">$55</span></strong>
               </button>
               <button class="tower-card" data-tower="rail">
                 <svg class="tower-icon rail" viewBox="0 0 40 40" aria-hidden="true">
@@ -81,7 +101,7 @@
                   <circle class="icon-fill" cx="30" cy="10" r="3" />
                 </svg>
                 <span class="tower-copy"><b>Рельсотрон</b><span>дальняя дистанция</span></span>
-                <strong>85 ◈</strong>
+                <strong><span class="cash-price">$85</span></strong>
               </button>
               <button class="tower-card" data-tower="frost">
                 <svg class="tower-icon frost" viewBox="0 0 40 40" aria-hidden="true">
@@ -90,7 +110,7 @@
                   <circle class="icon-fill" cx="20" cy="20" r="3" />
                 </svg>
                 <span class="tower-copy"><b>Криоузел</b><span>замедляет врагов</span></span>
-                <strong>75 ◈</strong>
+                <strong><span class="cash-price">$75</span></strong>
               </button>
               <button class="tower-card" data-tower="blast">
                 <svg class="tower-icon blast" viewBox="0 0 40 40" aria-hidden="true">
@@ -99,7 +119,7 @@
                   <circle class="icon-fill" cx="20" cy="20" r="3" />
                 </svg>
                 <span class="tower-copy"><b>Разлом</b><span>урон по области</span></span>
-                <strong>110 ◈</strong>
+                <strong><span class="cash-price">$110</span></strong>
               </button>
               <button class="tower-card" data-tower="arc">
                 <svg class="tower-icon arc" viewBox="0 0 40 40" aria-hidden="true">
@@ -108,35 +128,46 @@
                   <path class="icon-stroke" d="M22 7 13 20h9l-3 12" />
                 </svg>
                 <span class="tower-copy"><b>Дуга</b><span>цепная молния</span></span>
-                <strong>140 ◈</strong>
+                <strong><span class="cash-price">$140</span></strong>
+              </button>
+              <button class="tower-card" data-tower="singularity">
+                <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true">
+                  <circle class="icon-bg" cx="20" cy="20" r="16" />
+                  <circle class="icon-stroke" cx="20" cy="20" r="11" />
+                  <circle class="icon-stroke" cx="20" cy="20" r="5" />
+                  <circle class="icon-fill" cx="20" cy="20" r="2.8" />
+                </svg>
+                <span class="tower-copy"><b>Нуль-коллайдер</b><span>гигантский взрыв</span></span>
+                <strong><span class="cash-price">$100000</span></strong>
               </button>
             </div>
           </section>
 
-          <section class="panel-section selected-box">
+          <section class="panel-section selected-box selected-section">
             <h2>Выбрано</h2>
             <div id="selectionInfo" class="selection-info">
               <p>Башня: Импульс</p>
-              <p>Стоимость: 55 ◈</p>
+              <p>Стоимость: <span class="cash-price">$55</span></p>
             </div>
             <div class="action-grid upgrade-grid">
-              <button id="upgradeBtn" class="primary" disabled>Урон +</button>
-              <button id="rangeBtn" disabled>Радиус +</button>
-              <button id="speedBtnUpgrade" disabled>Скорость +</button>
+              <button id="upgradeBtn" class="upgrade-damage" disabled>Урон +</button>
+              <button id="rangeBtn" class="upgrade-range" disabled>Радиус +</button>
+              <button id="speedBtnUpgrade" class="upgrade-speed" disabled>Скорость +</button>
               <button id="sellBtn" disabled>Продать</button>
             </div>
           </section>
 
-          <section class="panel-section">
+          <section class="panel-section wave-control-section">
             <h2>Бесконечные волны</h2>
             <div class="wave-card">
               <div>
-                <span id="waveName">Готовность</span>
-                <small id="enemyCount">Нажмите старт</small>
+                <span id="waveName">Автоволны</span>
+                <small id="enemyCount">Первая волна начнётся автоматически</small>
               </div>
-              <button id="startWaveBtn" class="primary">Старт</button>
+              <span class="auto-wave-badge">AUTO</span>
             </div>
             <div class="control-row">
+              <button id="nextWaveBtn" class="primary">Запустить волну</button>
               <button id="pauseBtn">Пауза</button>
               <button id="speedBtn">x1</button>
             </div>
@@ -144,12 +175,34 @@
           </section>
         </aside>
       </main>
+      <div class="pause-overlay hidden" id="pauseOverlay" aria-live="polite">
+        <div class="pause-card">
+          <div class="pause-icon">Ⅱ</div>
+          <h2>Пауза</h2>
+          <p>Симуляция остановлена</p>
+          <button id="resumeBtn" class="primary">Продолжить</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-widget" id="settingsWidget" aria-label="Настройки игры">
+      <button id="settingsBtn" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settingsPanel" title="Настройки">⚙ Настройки</button>
+      <div class="settings-panel hidden" id="settingsPanel">
+        <button id="fullscreenBtn" class="floating-fullscreen" type="button">⛶ Весь экран</button>
+        <div class="floating-volume">
+          <div class="volume-head">
+            <label for="volumeSlider">🔊 Громкость</label>
+            <span id="volumeValue">55%</span>
+          </div>
+          <input id="volumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" />
+        </div>
+      </div>
     </div>
 
     <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
       <div class="modal-card">
         <h2 id="endTitle">Игра окончена</h2>
-        <p id="endText">Ядро не выдержало натиск.</p>
+        <p id="endText">Жизни закончились.</p>
         <button id="restartBtn" class="primary">Играть снова</button>
       </div>
     </div>
