@@ -209,7 +209,11 @@ const GAME_HEIGHT = 640;
 canvas.width = GAME_WIDTH;
 canvas.height = GAME_HEIGHT;
 
-const MAX_UPGRADE_LEVEL = 5;
+const MAX_UPGRADE_LEVEL = 8;
+const SPEED_OVERDRIVE_CHANCE = 0.25;
+const SPEED_OVERDRIVE_INTERVAL = 5;
+const SPEED_OVERDRIVE_DURATION = 10;
+const SPEED_OVERDRIVE_SHAKE_DURATION = SPEED_OVERDRIVE_DURATION;
 
 const towerTypes = {
   pulse: {
@@ -266,15 +270,56 @@ const towerTypes = {
     chain: 2
   },
 
+  titan: {
+    name: "Титан",
+    cost: 10000,
+    unlockWave: 20,
+    damage: 520,
+    range: 230,
+    fireRate: 1.05,
+    color: "#ff9f43",
+    projectileSpeed: 760,
+    splash: 42,
+    description: "мощный удар с уроном по области"
+  },
+
+  nova: {
+    name: "Нова",
+    cost: 20000,
+    unlockWave: 40,
+    damage: 980,
+    range: 250,
+    fireRate: 1.25,
+    color: "#5ee7ff",
+    projectileSpeed: 820,
+    splash: 70,
+    description: "сильный взрыв с большим радиусом"
+  },
+
+  devastator: {
+    name: "Опустошитель",
+    cost: 50000,
+    unlockWave: 70,
+    damage: 3200,
+    range: 275,
+    fireRate: 1.65,
+    color: "#ff5577",
+    projectileSpeed: 900,
+    splash: 95,
+    description: "тяжёлый урон по большой области"
+  },
+
   singularity: {
     name: "Нуль-коллайдер",
     cost: 100000,
+    unlockWave: 100,
     damage: 25000,
     range: 300,
     fireRate: 4.5,
     color: "#ff4dff",
     projectileSpeed: 520,
-    splash: 105
+    splash: 105,
+    description: "ультимативная башня с колоссальным уроном"
   }
 };
 
@@ -299,6 +344,7 @@ const state = {
 
   selectedType: null,
   selectedTower: null,
+  rangeUpgradeHover: false,
   previewX: 0,
   previewY: 0,
   previewValid: false,
@@ -433,6 +479,7 @@ function distanceToSegment(px, py, x1, y1, x2, y2) {
 
 function isOnRoad(x, y) {
   const roadWidth = 72;
+  const towerBodyRadius = 22;
 
   for (let i = 0; i < path.length - 1; i++) {
     const a = path[i];
@@ -446,7 +493,7 @@ function isOnRoad(x, y) {
             a.y,
             b.x,
             b.y
-        ) < roadWidth / 2
+        ) < roadWidth / 2 + towerBodyRadius
     ) {
       return true;
     }
@@ -460,11 +507,58 @@ function isOnRoad(x, y) {
    БАШНИ
 ========================================================= */
 
+function isTowerUnlocked(type) {
+  const unlockWave = towerTypes[type]?.unlockWave;
+  return !unlockWave || state.wave >= unlockWave;
+}
+
+function updateTowerAvailability() {
+  document.querySelectorAll(".tower-card").forEach(card => {
+    const type = card.dataset.tower;
+    const def = towerTypes[type];
+    if (!def) return;
+
+    const unlocked = isTowerUnlocked(type);
+    card.classList.toggle("locked", !unlocked);
+    card.classList.toggle("mystery", !unlocked);
+    card.setAttribute("aria-disabled", String(!unlocked));
+
+    const icon = card.querySelector(".tower-icon");
+    const mysteryIcon = card.querySelector(".tower-mystery-icon");
+    const name = card.querySelector(".tower-name");
+    const desc = card.querySelector(".tower-desc");
+    const price = card.querySelector(".cash-price");
+    const unlock = card.querySelector(".tower-unlock");
+
+    if (icon) icon.hidden = !unlocked;
+    if (mysteryIcon) mysteryIcon.hidden = unlocked;
+
+    if (name) name.textContent = unlocked ? def.name : "???";
+    if (desc) {
+      if (unlocked) {
+        desc.textContent = def.description || desc.dataset.defaultText || "";
+      } else {
+        desc.textContent = def.unlockWave
+          ? `Открывается с ${def.unlockWave}-й волны`
+          : "Скрытая башня";
+      }
+    }
+    if (price) price.textContent = unlocked ? `$${def.cost}` : "???";
+    if (unlock) {
+      unlock.textContent = unlocked
+        ? (unlock.dataset.defaultText || "")
+        : "";
+    }
+  });
+}
+
 function towerAt(x, y) {
+  const towerHitRadius = 24;
+
   for (let i = state.towers.length - 1; i >= 0; i--) {
     const tower = state.towers[i];
 
-    if (distance({ x, y }, tower) <= 25) {
+    if (distance({ x, y }, tower) <= towerHitRadius) {
       return tower;
     }
   }
@@ -477,11 +571,14 @@ function canPlaceTower(x, y) {
     return false;
   }
 
-  if (x < 30 || x > GAME_WIDTH - 30) {
+  const towerBodyRadius = 22;
+  const towerGap = 2;
+
+  if (x < towerBodyRadius || x > GAME_WIDTH - towerBodyRadius) {
     return false;
   }
 
-  if (y < 30 || y > GAME_HEIGHT - 30) {
+  if (y < towerBodyRadius || y > GAME_HEIGHT - towerBodyRadius) {
     return false;
   }
 
@@ -490,7 +587,7 @@ function canPlaceTower(x, y) {
   }
 
   for (const tower of state.towers) {
-    if (distance({ x, y }, tower) < 55) {
+    if (distance({ x, y }, tower) < towerBodyRadius * 2 + towerGap) {
       return false;
     }
   }
@@ -517,6 +614,7 @@ function placeSelectedTower(x, y) {
   if (state.money < type.cost) {
     clearTowerTypeSelection();
     state.selectedTower = null;
+        state.rangeUpgradeHover = false;
     setHint("Недостаточно долларов. Выбор башни снят.");
     updateUi();
     return;
@@ -525,6 +623,7 @@ function placeSelectedTower(x, y) {
   if (!canPlaceTower(x, y)) {
     clearTowerTypeSelection();
     state.selectedTower = null;
+        state.rangeUpgradeHover = false;
     setHint("Здесь нельзя поставить башню. Выбор башни снят.");
     updateUi();
     return;
@@ -546,6 +645,10 @@ function placeSelectedTower(x, y) {
     fireRate: type.fireRate,
 
     cooldown: 0,
+    speedOverdrive: false,
+    speedOverdriveTimer: 0,
+    speedOverdriveCheckTimer: SPEED_OVERDRIVE_INTERVAL,
+    speedOverdriveShake: 0,
 
     totalSpent: type.cost
   };
@@ -584,7 +687,8 @@ function getTowerStats(tower) {
     range: base.range + (rangeLevel - 1) * 15,
     fireRate: Math.max(
         0.12,
-        base.fireRate * Math.pow(0.92, speedLevel - 1)
+        base.fireRate * Math.pow(0.92, speedLevel - 1) *
+          (tower.speedOverdrive ? 0.5 : 1)
     )
   };
 }
@@ -705,12 +809,56 @@ function getWaveScaling(wave) {
   };
 }
 
+
+const enemyTypes = [
+  { color: "#ff5277", glow: "#ff5277", shape: "circle" },
+  { color: "#ff9f43", glow: "#ff9f43", shape: "square" },
+  { color: "#ffe66d", glow: "#ffe66d", shape: "triangle" },
+  { color: "#62f6ff", glow: "#62f6ff", shape: "diamond" },
+  { color: "#5c7cfa", glow: "#5c7cfa", shape: "hex" },
+  { color: "#b86bff", glow: "#b86bff", shape: "star" },
+  { color: "#42e6a4", glow: "#42e6a4", shape: "pentagon" },
+  { color: "#f36cff", glow: "#f36cff", shape: "cross" },
+  { color: "#78a9ff", glow: "#78a9ff", shape: "octagon" },
+  { color: "#ff6b9a", glow: "#ff6b9a", shape: "bolt" }
+];
+
+function getEnemyType(waveNumber) {
+  return enemyTypes[(Math.max(1, waveNumber) - 1) % enemyTypes.length];
+}
+
+function drawEnemyShape(x, y, radius, shape) {
+  ctx.beginPath();
+  if (shape === "circle") { ctx.arc(x, y, radius, 0, Math.PI * 2); return; }
+  if (shape === "square") { ctx.rect(x - radius, y - radius, radius * 2, radius * 2); return; }
+  const count = shape === "triangle" ? 3 : shape === "pentagon" ? 5 : shape === "hex" ? 6 : shape === "octagon" ? 8 : shape === "diamond" ? 4 : 5;
+  if (shape === "cross") {
+    ctx.moveTo(x - radius * .35, y - radius); ctx.lineTo(x + radius * .35, y - radius);
+    ctx.lineTo(x + radius * .35, y - radius * .35); ctx.lineTo(x + radius, y - radius * .35);
+    ctx.lineTo(x + radius, y + radius * .35); ctx.lineTo(x + radius * .35, y + radius * .35);
+    ctx.lineTo(x + radius * .35, y + radius); ctx.lineTo(x - radius * .35, y + radius);
+    ctx.lineTo(x - radius * .35, y + radius * .35); ctx.lineTo(x - radius, y + radius * .35);
+    ctx.lineTo(x - radius, y - radius * .35); ctx.lineTo(x - radius * .35, y - radius * .35); ctx.closePath(); return;
+  }
+  if (shape === "star") {
+    for (let i=0;i<10;i++) { const a=-Math.PI/2+i*Math.PI/5; const r=i%2?radius*.45:radius; const px=x+Math.cos(a)*r, py=y+Math.sin(a)*r; i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.closePath(); return;
+  }
+  if (shape === "bolt") {
+    ctx.moveTo(x+radius*.15,y-radius); ctx.lineTo(x-radius*.7,y+radius*.05); ctx.lineTo(x-radius*.08,y+radius*.02); ctx.lineTo(x-radius*.35,y+radius); ctx.lineTo(x+radius*.72,y-radius*.18); ctx.lineTo(x+radius*.12,y-radius*.12); ctx.closePath(); return;
+  }
+  for (let i=0;i<count;i++) { const a=-Math.PI/2+i*Math.PI*2/count; const px=x+Math.cos(a)*radius, py=y+Math.sin(a)*radius; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+  ctx.closePath();
+}
+
 function spawnEnemy(waveNumber = state.wave) {
   const scaling = getWaveScaling(waveNumber);
   const maxHp = Math.round(scaling.hp);
 
+  const enemyType = getEnemyType(waveNumber);
+
   const enemy = {
     waveNumber,
+    enemyType,
     distance: 0,
     x: path[0].x,
     y: path[0].y,
@@ -967,6 +1115,29 @@ function findTarget(tower) {
 
 function updateTowers(dt) {
   for (const tower of state.towers) {
+    if ((tower.speedLevel || 1) >= 6) {
+      tower.speedOverdriveCheckTimer = Math.max(0, (tower.speedOverdriveCheckTimer ?? SPEED_OVERDRIVE_INTERVAL) - dt);
+      if (tower.speedOverdriveCheckTimer <= 0) {
+        tower.speedOverdriveCheckTimer = SPEED_OVERDRIVE_INTERVAL;
+        if (Math.random() < SPEED_OVERDRIVE_CHANCE) {
+          tower.speedOverdrive = true;
+          tower.speedOverdriveTimer = SPEED_OVERDRIVE_DURATION;
+          tower.speedOverdriveShake = SPEED_OVERDRIVE_SHAKE_DURATION;
+          tower.cooldown = 0;
+        }
+      }
+    } else {
+      tower.speedOverdriveCheckTimer = SPEED_OVERDRIVE_INTERVAL;
+    }
+
+    if (tower.speedOverdrive) {
+      tower.speedOverdriveTimer = Math.max(0, (tower.speedOverdriveTimer || 0) - dt);
+      if (tower.speedOverdriveTimer <= 0) tower.speedOverdrive = false;
+    }
+
+    if (tower.speedOverdriveShake > 0) {
+      tower.speedOverdriveShake = Math.max(0, tower.speedOverdriveShake - dt);
+    }
     tower.cooldown -= dt;
 
     if (tower.cooldown > 0) {
@@ -1195,6 +1366,12 @@ function upgradeTowerStat(kind) {
   tower[`${kind}Level`] = (tower[`${kind}Level`] || 1) + 1;
   tower.totalSpent += cost;
 
+  if (kind === 'speed' && tower['speedLevel'] === 6) {
+    tower.speedOverdrive = false;
+    tower.speedOverdriveTimer = 0;
+    tower.speedOverdriveCheckTimer = SPEED_OVERDRIVE_INTERVAL;
+  }
+
   const names = {
     damage: 'урон',
     range: 'радиус',
@@ -1247,6 +1424,8 @@ function sellSelectedTower() {
 ========================================================= */
 
 function updateUi() {
+  updateTowerAvailability();
+
   moneyEl.textContent =
       `$${Math.floor(state.money)}`;
 
@@ -1273,12 +1452,45 @@ function updateUi() {
     const rangeCost = getUpgradeCost(tower, 'range');
     const speedCost = getUpgradeCost(tower, 'speed');
 
+    const damageLevel = tower.damageLevel || 1;
+    const rangeLevel = tower.rangeLevel || 1;
+    const speedLevel = tower.speedLevel || 1;
+    const nextDamage = damageLevel < MAX_UPGRADE_LEVEL
+        ? Math.round(type.damage * (1 + damageLevel * 0.35))
+        : stats.damage;
+    const nextRange = rangeLevel < MAX_UPGRADE_LEVEL
+        ? type.range + rangeLevel * 15
+        : stats.range;
+    const nextFireRate = speedLevel < MAX_UPGRADE_LEVEL
+        ? Math.max(0.12, type.fireRate * Math.pow(0.92, speedLevel))
+        : stats.fireRate;
+
+    const statRow = (label, kind, level, current, next, suffix = '') => {
+      const bars = Array.from({ length: MAX_UPGRADE_LEVEL }, (_, index) => {
+        const n = index + 1;
+        const filled = n <= level;
+        const preview = n === level + 1 && level < MAX_UPGRADE_LEVEL;
+        return `<span class="stat-bar ${filled ? `filled ${kind}` : ''} ${preview ? `preview ${kind}` : ''}" title="${n === level ? `Текущий уровень: ${level}` : preview ? `Следующий уровень: ${level + 1}` : `Уровень ${n}`}" aria-hidden="true"></span>`;
+      }).join('');
+      return `
+        <div class="stat-preview">
+          <span class="stat-preview-label">${label}</span>
+          <div class="stat-bars" aria-label="${label}: уровень ${level} из ${MAX_UPGRADE_LEVEL}${level < MAX_UPGRADE_LEVEL ? `, следующий уровень ${level + 1}` : ', максимум'}">${bars}</div>
+        </div>`;
+    };
+
     selectionInfo.innerHTML = `
-            <p>Башня: ${type.name}</p>
-            <p>Урон: ${stats.damage} · ур. ${tower.damageLevel || 1}</p>
-            <p>Радиус: ${Math.round(stats.range)} · ур. ${tower.rangeLevel || 1}</p>
-            <p>Скорость атаки: ${stats.fireRate.toFixed(2)}с · ур. ${tower.speedLevel || 1}</p>
-        `;
+      <div class="selection-title-row">
+        <strong>${type.name}</strong>
+        <span class="selection-cost">$${Math.floor(tower.totalSpent || type.cost)}</span>
+      </div>
+      <p>Текущие параметры · следующий уровень подсвечен пунктиром</p>
+      <div class="stat-preview-list">
+        ${statRow('Урон', 'damage', damageLevel, stats.damage, nextDamage)}
+        ${statRow('Радиус', 'range', rangeLevel, Math.round(stats.range), Math.round(nextRange))}
+        ${statRow('Темп', 'speed', speedLevel, stats.fireRate.toFixed(2), nextFireRate.toFixed(2), 'с')}
+      </div>
+    `;
 
     upgradeBtn.textContent = damageCost === Infinity ? "Урон MAX" : `Урон + ($${damageCost})`;
     rangeBtn.textContent = rangeCost === Infinity ? "Радиус MAX" : `Радиус + ($${rangeCost})`;
@@ -1295,11 +1507,17 @@ function updateUi() {
 
     selectionInfo.innerHTML = type
         ? `
-            <p>Башня: ${type.name}</p>
-            <p>Стоимость: $${type.cost}</p>
+            <div class="selection-title-row">
+              <strong>${type.name}</strong>
+              <span class="selection-cost">$${type.cost}</span>
+            </div>
+            <p>Выберите место на поле для установки.</p>
           `
         : `
-            <p>Башня не выбрана</p>
+            <div class="selection-title-row">
+              <strong>Башня не выбрана</strong>
+              <span class="selection-cost">—</span>
+            </div>
             <p>Выберите башню справа для установки.</p>
           `;
 
@@ -1456,6 +1674,11 @@ towerList.addEventListener(
         return;
       }
 
+      if (!isTowerUnlocked(type)) {
+        setHint(`Эта башня ещё не разблокирована. Нужна ${towerTypes[type].unlockWave}-я волна.`);
+        return;
+      }
+
       const wasSelected = state.selectedType === type;
 
       state.selectedTower = null;
@@ -1512,6 +1735,14 @@ rangeBtn.addEventListener(
       upgradeTowerStat('range');
     }
 );
+
+rangeBtn.addEventListener("mouseenter", () => {
+  state.rangeUpgradeHover = true;
+});
+
+rangeBtn.addEventListener("mouseleave", () => {
+  state.rangeUpgradeHover = false;
+});
 
 speedBtnUpgrade.addEventListener(
     "click",
@@ -1974,6 +2205,10 @@ function drawTower(tower) {
   const stats =
       getTowerStats(tower);
 
+  if (selected && state.rangeUpgradeHover) {
+    drawRangeUpgradePreview(tower, type);
+  }
+
   drawTowerUpgradeVisual(tower, type);
 
   /*
@@ -1981,11 +2216,20 @@ function drawTower(tower) {
    */
   ctx.save();
 
+  if (tower.speedOverdriveShake > 0) {
+    const intensity = 6.5 * (tower.speedOverdriveShake / SPEED_OVERDRIVE_SHAKE_DURATION);
+    ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
+  }
+
   ctx.shadowBlur =
-      selected ? 25 : 14;
+      selected ? 34 : 14;
 
   ctx.shadowColor =
       type.color;
+
+  if (selected) {
+    ctx.globalAlpha = 1;
+  }
 
   ctx.fillStyle =
       "#0d1826";
@@ -2144,90 +2388,32 @@ function drawTower(tower) {
 ========================================================= */
 
 function drawEnemy(enemy) {
-  if (enemy.dead) {
-    return;
-  }
+  if (enemy.dead) return;
 
-  const hpPercent =
-      Math.max(
-          0,
-          enemy.hp /
-          enemy.maxHp
-      );
+  const hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
+  const type = enemy.enemyType || getEnemyType(enemy.waveNumber);
 
   ctx.save();
-
   ctx.shadowBlur = 14;
-  ctx.shadowColor =
-      "#ff5277";
-
-  ctx.fillStyle =
-      "#20111d";
-
-  ctx.strokeStyle =
-      "#ff5277";
-
+  ctx.shadowColor = type.glow;
+  ctx.fillStyle = "#20111d";
+  ctx.strokeStyle = type.color;
   ctx.lineWidth = 2;
-
-  ctx.beginPath();
-
-  ctx.arc(
-      enemy.x,
-      enemy.y,
-      enemy.radius,
-      0,
-      Math.PI * 2
-  );
-
+  drawEnemyShape(enemy.x, enemy.y, enemy.radius, type.shape);
   ctx.fill();
   ctx.stroke();
-
   ctx.shadowBlur = 0;
 
-  /*
-   * Глаз.
-   */
-  ctx.fillStyle =
-      "#ff8ba3";
-
+  ctx.fillStyle = type.color;
   ctx.beginPath();
-
-  ctx.arc(
-      enemy.x,
-      enemy.y,
-      4,
-      0,
-      Math.PI * 2
-  );
-
+  ctx.arc(enemy.x, enemy.y, 3.5, 0, Math.PI * 2);
   ctx.fill();
 
-  /*
-   * HP полоска.
-   */
-  const barWidth = 30;
-  const barHeight = 4;
-
-  ctx.fillStyle =
-      "rgba(0,0,0,0.5)";
-
-  ctx.fillRect(
-      enemy.x - barWidth / 2,
-      enemy.y - 23,
-      barWidth,
-      barHeight
-  );
-
-  ctx.fillStyle =
-      "#ff5277";
-
-  ctx.fillRect(
-      enemy.x - barWidth / 2,
-      enemy.y - 23,
-      barWidth * hpPercent,
-      barHeight
-  );
-
+  const barWidth = 30, barHeight = 4;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(enemy.x - barWidth / 2, enemy.y - 23, barWidth, barHeight);
+  ctx.fillStyle = type.color;
+  ctx.fillRect(enemy.x - barWidth / 2, enemy.y - 23, barWidth * hpPercent, barHeight);
   ctx.restore();
 }
 
@@ -2456,6 +2642,45 @@ function drawTowerUpgradeVisual(tower, type) {
     ctx.arc(tower.x, tower.y, 7, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  ctx.restore();
+}
+
+function drawRangeUpgradePreview(tower, type) {
+  const rangeLevel = tower.rangeLevel || 1;
+  if (rangeLevel >= MAX_UPGRADE_LEVEL) return;
+
+  const stats = getTowerStats(tower);
+  const currentRange = stats.range;
+  const nextRange = type.range + rangeLevel * 15;
+
+  ctx.save();
+
+  // Текущий радиус — тонкий спокойный контур.
+  ctx.globalAlpha = 0.18;
+  ctx.strokeStyle = '#ffd43b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(tower.x, tower.y, currentRange, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Новый радиус — яркий пунктир, чтобы сразу видеть прибавку.
+  ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = '#fff0a6';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([8, 7]);
+  ctx.beginPath();
+  ctx.arc(tower.x, tower.y, nextRange, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Лёгкая подсветка только дополнительной области.
+  ctx.globalAlpha = 0.055;
+  ctx.fillStyle = '#ffd43b';
+  ctx.beginPath();
+  ctx.arc(tower.x, tower.y, nextRange, 0, Math.PI * 2);
+  ctx.arc(tower.x, tower.y, currentRange, 0, Math.PI * 2, true);
+  ctx.fill('evenodd');
 
   ctx.restore();
 }

@@ -130,30 +130,47 @@
                 <span class="tower-copy"><b>Дуга</b><span>цепная молния</span></span>
                 <strong><span class="cash-price">$140</span></strong>
               </button>
-              <button class="tower-card" data-tower="singularity">
-                <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true">
+              <button class="tower-card locked mystery" data-tower="titan" aria-disabled="true">
+                <span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon titan" viewBox="0 0 40 40" aria-hidden="true" hidden>
+                  <path class="icon-bg" d="M8 12h24v16H8z" />
+                  <path class="icon-stroke" d="M12 9v22M28 9v22M8 20h24M15 12h10v16H15z" />
+                  <circle class="icon-fill" cx="20" cy="20" r="3" />
+                </svg>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="мощный удар с уроном по области">Открывается с 20-й волны</span><span class="tower-unlock"></span></span>
+                <strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card locked mystery" data-tower="nova" aria-disabled="true">
+                <span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon nova" viewBox="0 0 40 40" aria-hidden="true" hidden>
+                  <circle class="icon-bg" cx="20" cy="20" r="16" />
+                  <path class="icon-stroke" d="M20 6 24 16 34 20 24 24 20 34 16 24 6 20 16 16z" />
+                  <circle class="icon-fill" cx="20" cy="20" r="4" />
+                </svg>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="сильный взрыв с большим радиусом">Открывается с 40-й волны</span><span class="tower-unlock"></span></span>
+                <strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card locked mystery" data-tower="devastator" aria-disabled="true">
+                <span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon devastator" viewBox="0 0 40 40" aria-hidden="true" hidden>
+                  <path class="icon-bg" d="M20 4 25 14 36 17 27 23 28 35 20 29 12 35 13 23 4 17 15 14z" />
+                  <path class="icon-stroke" d="M20 8v24M8 20h24M11 11l18 18M29 11 11 29" />
+                  <circle class="icon-fill" cx="20" cy="20" r="3" />
+                </svg>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="тяжёлый урон по большой области">Открывается с 70-й волны</span><span class="tower-unlock"></span></span>
+                <strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card locked mystery" data-tower="singularity" aria-disabled="true">
+                <span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true" hidden>
                   <circle class="icon-bg" cx="20" cy="20" r="16" />
                   <circle class="icon-stroke" cx="20" cy="20" r="11" />
                   <circle class="icon-stroke" cx="20" cy="20" r="5" />
                   <circle class="icon-fill" cx="20" cy="20" r="2.8" />
                 </svg>
-                <span class="tower-copy"><b>Нуль-коллайдер</b><span>гигантский взрыв</span></span>
-                <strong><span class="cash-price">$100000</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="ультимативная башня с колоссальным уроном">Открывается с 100-й волны</span><span class="tower-unlock"></span></span>
+                <strong><span class="cash-price">???</span></strong>
               </button>
-            </div>
-          </section>
-
-          <section class="panel-section selected-box selected-section">
-            <h2>Выбрано</h2>
-            <div id="selectionInfo" class="selection-info">
-              <p>Башня: Импульс</p>
-              <p>Стоимость: <span class="cash-price">$55</span></p>
-            </div>
-            <div class="action-grid upgrade-grid">
-              <button id="upgradeBtn" class="upgrade-damage" disabled>Урон +</button>
-              <button id="rangeBtn" class="upgrade-range" disabled>Радиус +</button>
-              <button id="speedBtnUpgrade" class="upgrade-speed" disabled>Скорость +</button>
-              <button id="sellBtn" disabled>Продать</button>
             </div>
           </section>
 
@@ -171,7 +188,39 @@
               <button id="pauseBtn">Пауза</button>
               <button id="speedBtn">x1</button>
             </div>
-            <button id="menuBtn" class="menu-back">← Главное меню</button>
+            <div class="wave-bottom-actions">
+              <div class="settings-widget" id="settingsWidget" aria-label="Настройки игры">
+                <button id="settingsBtn" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settingsPanel" title="Настройки">⚙ Настройки</button>
+                <div class="settings-panel hidden" id="settingsPanel">
+                  <button id="fullscreenBtn" class="floating-fullscreen" type="button">⛶ Весь экран</button>
+                  <div class="floating-volume">
+                    <div class="volume-head">
+                      <label for="volumeSlider">🔊 Громкость</label>
+                      <span id="volumeValue">55%</span>
+                    </div>
+                    <input id="volumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" />
+                  </div>
+                </div>
+              </div>
+              <button id="menuBtn" class="menu-back">← Главное меню</button>
+            </div>
+          </section>
+
+          <section class="panel-section selected-box selected-section">
+            <h2>Прокачка</h2>
+            <div id="selectionInfo" class="selection-info">
+              <div class="selection-title-row">
+                <strong>Башня не выбрана</strong>
+                <span class="selection-cost">—</span>
+              </div>
+              <p>Выберите башню справа для установки.</p>
+            </div>
+            <div class="action-grid upgrade-grid">
+              <button id="upgradeBtn" class="upgrade-damage" disabled>Урон +</button>
+              <button id="rangeBtn" class="upgrade-range" disabled>Радиус +</button>
+              <button id="speedBtnUpgrade" class="upgrade-speed" disabled>Скорость +</button>
+              <button id="sellBtn" disabled>Продать</button>
+            </div>
           </section>
         </aside>
       </main>
@@ -185,19 +234,7 @@
       </div>
     </div>
 
-    <div class="settings-widget" id="settingsWidget" aria-label="Настройки игры">
-      <button id="settingsBtn" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settingsPanel" title="Настройки">⚙ Настройки</button>
-      <div class="settings-panel hidden" id="settingsPanel">
-        <button id="fullscreenBtn" class="floating-fullscreen" type="button">⛶ Весь экран</button>
-        <div class="floating-volume">
-          <div class="volume-head">
-            <label for="volumeSlider">🔊 Громкость</label>
-            <span id="volumeValue">55%</span>
-          </div>
-          <input id="volumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" />
-        </div>
-      </div>
-    </div>
+
 
     <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
       <div class="modal-card">
