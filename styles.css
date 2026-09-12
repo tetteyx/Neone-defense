@@ -258,7 +258,7 @@ canvas {
 
 .tower-card {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr) 78px;
   gap: 8px 10px;
   align-items: center;
   width: 100%;
@@ -286,8 +286,16 @@ canvas {
 .tower-card strong {
   grid-column: 3;
   align-self: center;
+  justify-self: end;
+  width: 78px;
+  min-width: 0;
   color: var(--green);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  font-size: 0.86rem;
+  line-height: 1.1;
 }
 
 .tower-card.active {
@@ -325,6 +333,7 @@ canvas {
 .tower-icon.blast { color: #ee6d68; }
 .tower-icon.arc { color: #c28cff; }
 .tower-icon.singularity { color: #ff4dff; }
+.tower-icon.booster { color: #72f2a2; }
 
 .selection-info {
   min-height: 74px;
@@ -442,6 +451,7 @@ canvas {
 .modal {
   position: fixed;
   inset: 0;
+  z-index: 100;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -692,6 +702,31 @@ canvas {
   font-size: 1.05rem;
 }
 
+.dev-money-btn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 8px;
+  border: 1px dashed rgba(255, 196, 87, 0.48);
+  border-radius: 9px;
+  background: rgba(255, 196, 87, 0.05);
+  color: #b9a77b;
+  font-size: .76rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+
+.dev-money-btn:hover {
+  border-color: rgba(255, 196, 87, 0.8);
+  color: #ffe6a3;
+}
+
+.dev-money-btn.active {
+  border-style: solid;
+  color: #ffe66d;
+  background: rgba(255, 230, 109, 0.10);
+  box-shadow: 0 0 14px rgba(255, 230, 109, 0.12);
+}
+
 .menu-tip {
   margin-top: 14px;
   color: #8292a4;
@@ -850,6 +885,7 @@ canvas {
 
 .modal-actions {
   display: grid;
+  gap: 9px;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 18px;
@@ -903,6 +939,25 @@ canvas {
 
 .settings-panel.hidden {
   display: none;
+}
+
+/* Game Over: шестерёнка становится частью размытого фона. */
+.game-over-active .settings-widget {
+  pointer-events: none;
+  filter: blur(3px) saturate(0.35);
+  opacity: 0.28;
+}
+
+.game-over-active .settings-toggle {
+  box-shadow: none;
+  border-color: rgba(99, 230, 255, 0.12);
+  color: #62707d;
+  cursor: default;
+}
+
+.game-over-active .settings-toggle:hover {
+  border-color: rgba(99, 230, 255, 0.12);
+  box-shadow: none;
 }
 
 .floating-fullscreen {
@@ -1050,6 +1105,30 @@ canvas {
   text-transform: uppercase;
 }
 
+.stat-bars-wrap {
+  min-width: 0;
+  width: 100%;
+}
+
+.stat-value {
+  margin-top: 4px;
+  font-size: .72rem;
+  font-weight: 900;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+
+.stat-value-damage {
+  color: #ff7654;
+  text-shadow: 0 0 8px rgba(255,118,84,.18);
+}
+
+.stat-value-damage span {
+  color: inherit;
+  opacity: .82;
+}
+
 .stat-bars {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -1180,7 +1259,7 @@ canvas {
     flex: 1 1 auto;
     min-height: 0;
     height: auto;
-    grid-template-columns: minmax(0, 1fr) 500px;
+    grid-template-columns: minmax(0, 1fr) 540px;
     gap: 14px;
     align-items: stretch;
     overflow: hidden;
@@ -1262,6 +1341,7 @@ canvas {
   .tower-card {
     min-height: 54px;
     padding: 7px;
+    grid-template-columns: 31px minmax(0, 1fr) 78px;
   }
 
   .tower-icon,
@@ -1323,6 +1403,7 @@ canvas {
 
   .panel {
     gap: 7px;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
   }
 
   .panel-section {
@@ -1336,6 +1417,7 @@ canvas {
   .tower-card {
     min-height: 50px;
     padding: 6px;
+    grid-template-columns: 28px minmax(0, 1fr) 78px;
   }
 
   .tower-icon,
@@ -1355,3 +1437,281 @@ canvas {
     padding: 8px 9px;
   }
 }
+
+
+/* =========================================================
+   V24 — аккуратные карточки дорогих башен и управление
+========================================================= */
+.tower-list {
+  scrollbar-gutter: stable;
+}
+
+.tower-card {
+  grid-template-columns: 34px minmax(0, 1fr) max-content;
+  min-width: 0;
+}
+
+.tower-card strong {
+  grid-column: 3;
+  width: auto;
+  max-width: 96px;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  font-size: clamp(0.72rem, 0.9vw, 0.86rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tower-copy {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tower-copy b,
+.tower-copy > span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tower-card.mystery,
+.tower-card.locked[data-tower="titan"],
+.tower-card.locked[data-tower="nova"],
+.tower-card.locked[data-tower="devastator"],
+.tower-card.locked[data-tower="singularity"] {
+  min-height: 72px;
+}
+
+.tower-card.mystery .tower-copy > span:not(.tower-unlock),
+.tower-card.locked .tower-copy > span:not(.tower-unlock) {
+  line-height: 1.2;
+}
+
+/* Пауза и скорость — заметные кнопки в стиле интерфейса */
+#pauseBtn,
+#speedBtn {
+  min-height: 40px;
+  border-radius: 9px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+}
+
+#pauseBtn {
+  border-color: rgba(255, 196, 92, .58);
+  color: #ffe1a0;
+  background: linear-gradient(180deg, rgba(126, 83, 28, .72), rgba(65, 43, 17, .88));
+  box-shadow: inset 0 0 12px rgba(255, 196, 92, .07), 0 0 12px rgba(255, 196, 92, .10);
+}
+
+#pauseBtn:hover:not(:disabled) {
+  border-color: rgba(255, 211, 125, .95);
+  box-shadow: inset 0 0 14px rgba(255, 196, 92, .10), 0 0 20px rgba(255, 196, 92, .22);
+  transform: translateY(-1px);
+}
+
+#speedBtn {
+  border-color: rgba(99, 230, 255, .58);
+  color: #a9f2ff;
+  background: linear-gradient(180deg, rgba(24, 91, 112, .76), rgba(13, 43, 56, .9));
+  box-shadow: inset 0 0 12px rgba(99, 230, 255, .07), 0 0 12px rgba(99, 230, 255, .10);
+}
+
+#speedBtn:hover:not(:disabled) {
+  border-color: rgba(99, 230, 255, .95);
+  box-shadow: inset 0 0 14px rgba(99, 230, 255, .11), 0 0 20px rgba(99, 230, 255, .24);
+  transform: translateY(-1px);
+}
+
+#pauseBtn:active:not(:disabled),
+#speedBtn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Пауза не перекрывает поле всплывающим окном. */
+.pause-overlay {
+  display: none !important;
+}
+
+/* =========================================================
+   HEART LIVES
+========================================================= */
+.lives-status {
+  min-width: 150px;
+  padding: 7px 10px !important;
+  text-align: center;
+}
+
+.heart-lives {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+
+.life-heart {
+  display: inline-block;
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  transition: opacity .15s ease, transform .15s ease, filter .15s ease;
+}
+
+.life-heart.alive {
+  color: #ff4f6d;
+  text-shadow: 0 0 7px rgba(255, 54, 88, .9), 0 0 14px rgba(255, 54, 88, .45);
+}
+
+.life-heart.lost {
+  color: rgba(255,255,255,.14);
+  text-shadow: none;
+  opacity: .45;
+}
+
+.lives-status small {
+  letter-spacing: .14em;
+}
+
+/* V43 — закрытая башня: ? занимает ровно тот же слот, что и иконка */
+[hidden] {
+  display: none !important;
+}
+
+.tower-card .tower-mystery-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #c9a4ff;
+  font-size: 1.55rem;
+  line-height: 1;
+  font-weight: 900;
+  opacity: .95;
+  text-shadow: 0 0 8px rgba(190, 140, 255, .55);
+}
+
+.tower-card.mystery .tower-mystery-icon {
+  filter: drop-shadow(0 0 7px rgba(160, 100, 255, .28));
+}
+
+@media (min-width: 981px) {
+  .tower-card .tower-mystery-icon {
+    width: 31px;
+    height: 31px;
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .tower-card .tower-mystery-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 1.25rem;
+  }
+}
+
+
+/* V44 — стабильное переключение иконки закрытой/открытой башни */
+.tower-card .tower-icon,
+.tower-card .tower-mystery-icon {
+  display: none;
+  flex: 0 0 36px;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.tower-card:not(.tower-unlocked) .tower-mystery-icon {
+  display: grid;
+}
+
+.tower-card.tower-unlocked .tower-icon {
+  display: block;
+}
+
+.tower-card.tower-unlocked .tower-mystery-icon {
+  display: none;
+}
+
+.tower-card.tower-unlocked .tower-copy {
+  min-height: 36px;
+  justify-content: center;
+}
+
+/* Все карточки используют одинаковую компактную геометрию. */
+.tower-card {
+  min-height: 58px !important;
+  height: 58px;
+  align-items: center;
+}
+
+.tower-card .tower-copy b {
+  line-height: 1.05;
+}
+
+.tower-card .tower-copy > span {
+  line-height: 1.05;
+  font-size: 0.72rem;
+}
+
+.tower-card .cash-price {
+  white-space: nowrap;
+}
+
+
+/* v46 — поддерживающий модуль-усилитель */
+.support-card {
+  border-color: rgba(114, 242, 162, .32);
+  background: linear-gradient(180deg, rgba(38, 57, 49, .88), rgba(29, 39, 39, .92));
+}
+.support-card:hover {
+  border-color: rgba(114, 242, 162, .7);
+  box-shadow: 0 0 18px rgba(114, 242, 162, .16);
+}
+
+
+/* v47 — переключатель Башни / Усиления */
+.panel-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  border: 1px solid rgba(99, 230, 255, .16);
+  border-radius: 10px;
+  background: rgba(7, 16, 28, .72);
+}
+.panel-switch-btn {
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #7f91a5;
+  font-weight: 900;
+  cursor: pointer;
+}
+.panel-switch-btn.active {
+  color: #dffaff;
+  border-color: rgba(99, 230, 255, .46);
+  background: rgba(38, 83, 103, .72);
+  box-shadow: 0 0 12px rgba(99, 230, 255, .12);
+}
+.boost-list { display: grid; gap: 8px; }
+.boost-list.hidden, .tower-list.hidden { display: none !important; }
+.boost-info {
+  padding: 9px 10px; border: 1px solid rgba(114,242,162,.16); border-radius: 9px;
+  background: rgba(114,242,162,.045); display: grid; gap: 3px;
+}
+.boost-info strong { color:#c8f8d9; font-size:.78rem; }
+.boost-info span { color:#8fa0ae; font-size:.69rem; line-height:1.25; }
+
+.stat-value-range { color: #bd7cff; text-shadow: 0 0 8px rgba(189,124,255,.18); }
+.stat-value-speed { color: #59a9ff; text-shadow: 0 0 8px rgba(89,169,255,.18); }

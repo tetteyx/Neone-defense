@@ -8,6 +8,9 @@ const killsEl = document.getElementById("kills");
 
 const hintEl = document.getElementById("hint");
 const towerList = document.getElementById("towerList");
+const boostList = document.getElementById("boostList");
+const towersTab = document.getElementById("towersTab");
+const boostsTab = document.getElementById("boostsTab");
 const selectionInfo = document.getElementById("selectionInfo");
 
 const upgradeBtn = document.getElementById("upgradeBtn");
@@ -44,6 +47,7 @@ const mapList = document.getElementById("mapList");
 const selectedMapNameEl = document.getElementById("selectedMapName");
 const difficultyList = document.getElementById("difficultyList");
 const selectedDifficultyNameEl = document.getElementById("selectedDifficultyName");
+const devInfiniteMoneyBtn = document.getElementById("devInfiniteMoneyBtn");
 
 /* =========================================================
    САУНД-ДИЗАЙН
@@ -214,8 +218,42 @@ const SPEED_OVERDRIVE_CHANCE = 0.25;
 const SPEED_OVERDRIVE_INTERVAL = 5;
 const SPEED_OVERDRIVE_DURATION = 10;
 const SPEED_OVERDRIVE_SHAKE_DURATION = SPEED_OVERDRIVE_DURATION;
+const COMBO_RADIUS = 92;
+const COMBO_CHECK_INTERVAL = 5;
+
+// Режим тестирования: на старте игры доступен практически бесконечный запас денег.
+// Покупки и улучшения в этом режиме не уменьшают баланс, чтобы быстро тестировать
+// дорогие башни и комбо.
+let DEV_INFINITE_MONEY = false;
+const TEST_MONEY = 999999999;
 
 const towerTypes = {
+  booster: {
+    name: "Усилитель", cost: 500, unlockWave: 30, damage: 0, range: 145, fireRate: 999, color: "#72f2a2",
+    description: "+15% урон · +10 радиус · +8% скорость",
+    support: { damage: 0.15, range: 10, speed: 0.08 }
+  },
+  overcharger: {
+    name: "Разгонщик", cost: 2200, unlockWave: 90, damage: 0, range: 120, fireRate: 999, color: "#59a9ff",
+    description: "+18% скорость · +5% урон",
+    support: { damage: 0.05, range: 0, speed: 0.18 }
+  },
+  range_amp: {
+    name: "Дальний модуль", cost: 6500, unlockWave: 120, damage: 0, range: 175, fireRate: 999, color: "#bd7cff",
+    description: "+35 радиус · +8% урон",
+    support: { damage: 0.08, range: 35, speed: 0 }
+  },
+  reactor: {
+    name: "Реактор", cost: 18000, unlockWave: 200, damage: 0, range: 155, fireRate: 999, color: "#ffe66d",
+    description: "+15% урон · +12% скорость",
+    support: { damage: 0.15, range: 0, speed: 0.12 }
+  },
+  nexus: {
+    name: "Нексус", cost: 60000, unlockWave: 400, damage: 0, range: 210, fireRate: 999, color: "#ff4dff",
+    description: "+20% урон · +25 радиус · +10% скорость",
+    support: { damage: 0.20, range: 25, speed: 0.10 }
+  },
+
   pulse: {
     name: "Импульс",
     cost: 55,
@@ -223,7 +261,8 @@ const towerTypes = {
     range: 125,
     fireRate: 0.45,
     color: "#63e6ff",
-    projectileSpeed: 500
+    projectileSpeed: 500,
+    combo: { chance: 0.40, cooldown: 5, name: "Мины", description: "40% шанс каждые 5 секунд установить мину на дороге" }
   },
 
   rail: {
@@ -233,7 +272,8 @@ const towerTypes = {
     range: 220,
     fireRate: 1.5,
     color: "#b88cff",
-    projectileSpeed: 800
+    projectileSpeed: 800,
+    combo: { chance: 0.35, cooldown: 5, name: "Пробой", description: "35% шанс каждые 5 секунд пробить несколько самых опасных врагов" }
   },
 
   frost: {
@@ -245,7 +285,8 @@ const towerTypes = {
     color: "#7fffd4",
     projectileSpeed: 450,
     slow: 0.45,
-    slowTime: 1.5
+    slowTime: 1.5,
+    combo: { chance: 0.45, cooldown: 5, name: "Крио-волна", description: "45% шанс каждые 5 секунд заморозить группу врагов" }
   },
 
   blast: {
@@ -256,7 +297,8 @@ const towerTypes = {
     fireRate: 1.3,
     color: "#ff8b6b",
     projectileSpeed: 380,
-    splash: 55
+    splash: 55,
+    combo: { chance: 0.35, cooldown: 6, name: "Метеор", description: "35% шанс вызвать мощный взрыв на случайном участке дороги" }
   },
 
   arc: {
@@ -267,7 +309,8 @@ const towerTypes = {
     fireRate: 0.9,
     color: "#ffe66d",
     projectileSpeed: 650,
-    chain: 2
+    chain: 2,
+    combo: { chance: 0.35, cooldown: 6, name: "Цепная буря", description: "35% шанс поразить цепью до 6 врагов" }
   },
 
   titan: {
@@ -280,7 +323,8 @@ const towerTypes = {
     color: "#ff9f43",
     projectileSpeed: 760,
     splash: 42,
-    description: "мощный удар с уроном по области"
+    description: "урон по области",
+    combo: { chance: 0.30, cooldown: 7, name: "Орбитальный удар", description: "30% шанс обрушить удар на самую плотную группу" }
   },
 
   nova: {
@@ -293,7 +337,8 @@ const towerTypes = {
     color: "#5ee7ff",
     projectileSpeed: 820,
     splash: 70,
-    description: "сильный взрыв с большим радиусом"
+    description: "большой взрыв",
+    combo: { chance: 0.25, cooldown: 8, name: "Сверхновая", description: "25% шанс нанести урон всем врагам на дороге" }
   },
 
   devastator: {
@@ -306,7 +351,8 @@ const towerTypes = {
     color: "#ff5577",
     projectileSpeed: 900,
     splash: 95,
-    description: "тяжёлый урон по большой области"
+    description: "тяжёлый урон",
+    combo: { chance: 0.20, cooldown: 9, name: "Аннигиляция", description: "20% шанс сильно ослабить всех врагов" }
   },
 
   singularity: {
@@ -319,7 +365,8 @@ const towerTypes = {
     color: "#ff4dff",
     projectileSpeed: 520,
     splash: 105,
-    description: "ультимативная башня с колоссальным уроном"
+    description: "огромный урон",
+    combo: { chance: 0.15, cooldown: 10, name: "Сингулярность", description: "15% шанс создать чёрную дыру, разрушающую строй врагов" }
   }
 };
 
@@ -341,6 +388,7 @@ const state = {
   enemies: [],
   projectiles: [],
   effects: [],
+  mines: [],
 
   selectedType: null,
   selectedTower: null,
@@ -363,7 +411,9 @@ const state = {
 
   gameOver: false,
 
-  lastTime: 0
+  lastTime: 0,
+  comboCheckTimer: 0,
+  comboReadyTowers: new Set()
 };
 
 
@@ -434,6 +484,14 @@ function distance(a, b) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function spendMoney(amount) {
+  if (DEV_INFINITE_MONEY) {
+    state.money = TEST_MONEY;
+    return;
+  }
+  state.money -= amount;
 }
 
 function setHint(text) {
@@ -530,8 +588,9 @@ function updateTowerAvailability() {
     const price = card.querySelector(".cash-price");
     const unlock = card.querySelector(".tower-unlock");
 
-    if (icon) icon.hidden = !unlocked;
-    if (mysteryIcon) mysteryIcon.hidden = unlocked;
+    card.classList.toggle("tower-unlocked", unlocked);
+    if (icon) icon.removeAttribute("hidden");
+    if (mysteryIcon) mysteryIcon.removeAttribute("hidden");
 
     if (name) name.textContent = unlocked ? def.name : "???";
     if (desc) {
@@ -649,11 +708,12 @@ function placeSelectedTower(x, y) {
     speedOverdriveTimer: 0,
     speedOverdriveCheckTimer: SPEED_OVERDRIVE_INTERVAL,
     speedOverdriveShake: 0,
+    comboTimer: COMBO_CHECK_INTERVAL,
 
     totalSpent: type.cost
   };
 
-  state.money -= type.cost;
+  spendMoney(type.cost);
 
   state.towers.push(tower);
 
@@ -680,34 +740,71 @@ function getTowerStats(tower) {
   const rangeLevel = tower.rangeLevel || 1;
   const speedLevel = tower.speedLevel || 1;
 
+  const d = Math.max(0, damageLevel - 1);
+  // Урон растёт всё быстрее с каждым уровнем: первые улучшения умеренные,
+  // высокие уровни становятся заметно сильнее и дороже.
+  let damage = base.damage * (1 + d * 0.24 + d * d * 0.025);
+  let range = base.range + (rangeLevel - 1) * 12;
+  let fireRate = Math.max(
+      0.12,
+      base.fireRate * Math.pow(0.94, speedLevel - 1) *
+        (tower.speedOverdrive ? 0.5 : 1)
+  );
+
+  if (!isSupportType(tower.type)) {
+    const support = getSupportBonus(tower);
+    damage *= 1 + support.damage;
+    range += support.range;
+    fireRate *= 1 - support.speed;
+  }
+
   return {
-    damage: Math.round(
-        base.damage * (1 + (damageLevel - 1) * 0.35)
-    ),
-    range: base.range + (rangeLevel - 1) * 15,
-    fireRate: Math.max(
-        0.12,
-        base.fireRate * Math.pow(0.92, speedLevel - 1) *
-          (tower.speedOverdrive ? 0.5 : 1)
-    )
+    damage: Math.round(damage),
+    range,
+    fireRate: Math.max(0.08, fireRate)
   };
 }
 
-function getUpgradeCost(tower, kind) {
-  const baseCost = towerTypes[tower.type].cost;
-  const level = tower[`${kind}Level`] || 1;
+function getProjectedFireRate(tower, speedLevel) {
+  const base = towerTypes[tower.type];
+  let fireRate = Math.max(
+      0.12,
+      base.fireRate * Math.pow(0.94, Math.max(0, speedLevel - 1))
+  );
 
-  if (level >= MAX_UPGRADE_LEVEL) {
-    return Infinity;
+  if (!isSupportType(tower.type)) {
+    const support = getSupportBonus(tower);
+    fireRate *= 1 - support.speed;
   }
 
-  const multipliers = {
-    damage: 0.42,
-    range: 0.34,
-    speed: 0.48
-  };
+  return Math.max(0.08, fireRate);
+}
 
-  return Math.floor(baseCost * (0.75 + level * multipliers[kind]));
+function isSupportType(type) {
+  return !!towerTypes[type]?.support;
+}
+
+function getSupportBonus(tower) {
+  const result = { damage: 0, range: 0, speed: 0 };
+  if (isSupportType(tower.type)) return result;
+
+  for (const support of state.towers) {
+    const supportType = towerTypes[support.type];
+    if (!supportType?.support) continue;
+    if (distance(support, tower) <= supportType.range) {
+      result.damage += supportType.support.damage || 0;
+      result.range += supportType.support.range || 0;
+      result.speed += supportType.support.speed || 0;
+    }
+  }
+
+  result.speed = Math.min(0.45, result.speed);
+  return result;
+}
+
+// Совместимость со старой системой усилителя.
+function getBoosterBonus(tower) {
+  return getSupportBonus(tower);
 }
 
 
@@ -792,20 +889,37 @@ function getWaveScaling(wave) {
   const w = Math.max(1, wave);
   const difficulty = getDifficulty();
 
-  const hpGrowth = Math.pow(1 + 0.085 * (w - 1), 1.12);
-  const speedGrowth = Math.min(2.15, 1 + 0.0105 * (w - 1));
-  const rewardGrowth = Math.pow(1 + 0.040 * (w - 1), 0.92);
+  // Ранние волны остаются дружелюбными, но после 100-й начинается
+  // заметно более резкий Onslaught-подобный разгон сложности.
+  const earlyHp = Math.pow(1 + 0.085 * (w - 1), 1.12);
+  const late = Math.max(0, w - 100);
+  const brutal = Math.max(0, w - 220);
+  const lateHpMultiplier =
+      Math.pow(1 + late * 0.0105, 1.22) *
+      Math.pow(1 + brutal * 0.016, 1.30);
+  const hpGrowth = earlyHp * lateHpMultiplier;
+
+  const speedGrowth =
+      Math.min(2.35, 1 + 0.0105 * (w - 1) + Math.max(0, w - 160) * 0.0015);
+
+  // Награда больше не растёт пропорционально номеру волны: иначе поздняя
+  // экономика начинает бесконечно опережать здоровье врагов.
+  const rewardGrowth =
+      1 + 0.042 * Math.min(w, 80) +
+      0.018 * Math.sqrt(Math.max(0, w - 80));
+
   const countGrowth =
       6 +
       Math.floor(2.35 * Math.sqrt(w - 1)) +
-      Math.floor((w - 1) * 0.07);
+      Math.floor((w - 1) * 0.07) +
+      Math.floor(Math.max(0, w - 180) * 0.035);
 
   return {
     hp: Math.max(1, 70 * hpGrowth * difficulty.hpMultiplier),
     speed: 45 * speedGrowth * difficulty.speedMultiplier,
     reward: Math.max(1, 7 * rewardGrowth * difficulty.rewardMultiplier),
     count: Math.max(4, Math.round(countGrowth * difficulty.countMultiplier)),
-    spawnInterval: Math.max(0.25, 0.72 - Math.min(0.38, (w - 1) * 0.0038))
+    spawnInterval: Math.max(0.20, 0.72 - Math.min(0.43, (w - 1) * 0.0038))
   };
 }
 
@@ -1113,8 +1227,300 @@ function findTarget(tower) {
    БАШНИ СТРЕЛЯЮТ
 ========================================================= */
 
+function getComboGroups() {
+  const groups = [];
+  const visited = new Set();
+
+  for (let i = 0; i < state.towers.length; i++) {
+    if (visited.has(i)) continue;
+    const startTower = state.towers[i];
+    if ((startTower.damageLevel || 1) < MAX_UPGRADE_LEVEL) continue;
+
+    const queue = [i];
+    const group = [];
+    visited.add(i);
+
+    while (queue.length) {
+      const index = queue.shift();
+      const tower = state.towers[index];
+      group.push(tower);
+
+      for (let j = 0; j < state.towers.length; j++) {
+        if (visited.has(j)) continue;
+        const other = state.towers[j];
+        if (other.type !== startTower.type) continue;
+        if ((other.damageLevel || 1) < MAX_UPGRADE_LEVEL) continue;
+        if (distance(tower, other) <= COMBO_RADIUS) {
+          visited.add(j);
+          queue.push(j);
+        }
+      }
+    }
+
+    if (group.length >= 3) groups.push(group);
+  }
+
+  return groups;
+}
+
+function getRandomRoadPoint(minRatio = 0.12, maxRatio = 0.88) {
+  const ratio = minRatio + Math.random() * (maxRatio - minRatio);
+  return getPointOnPath(PATH_LENGTH * ratio);
+}
+
+function createComboMine(x, y, color) {
+  state.mines.push({
+    x,
+    y,
+    radius: 54,
+    life: 18,
+    maxLife: 18,
+    color,
+    armed: true,
+    pulse: 0
+  });
+  state.effects.push({ type: "minePlace", x, y, life: 0.5, maxLife: 0.5, color });
+}
+
+function launchComboMine(tower, target, color) {
+  state.comboProjectiles.push({
+    x: tower.x,
+    y: tower.y,
+    startX: tower.x,
+    startY: tower.y,
+    targetX: target.x,
+    targetY: target.y,
+    progress: 0,
+    duration: 0.55,
+    color,
+    dead: false
+  });
+  state.effects.push({ type: "comboBurst", x: tower.x, y: tower.y, radius: 22, life: 0.3, maxLife: 0.3, color });
+}
+
+function updateComboProjectiles(dt) {
+  if (!Array.isArray(state.comboProjectiles) || state.comboProjectiles.length === 0) return;
+
+  for (const projectile of state.comboProjectiles) {
+    if (!Number.isFinite(projectile.progress)) projectile.progress = 0;
+    projectile.progress += dt / Math.max(0.05, projectile.duration || 0.55);
+    const t = Math.min(1, projectile.progress);
+    const arc = Math.sin(t * Math.PI) * 38;
+    projectile.x = projectile.startX + (projectile.targetX - projectile.startX) * t;
+    projectile.y = projectile.startY + (projectile.targetY - projectile.startY) * t - arc;
+
+    if (t >= 1 && !projectile.dead) {
+      createComboMine(projectile.targetX, projectile.targetY, projectile.color);
+      projectile.dead = true;
+    }
+  }
+  state.comboProjectiles = state.comboProjectiles.filter(projectile => !projectile.dead);
+}
+function triggerCombo(group) {
+  const tower = group[0];
+  const type = towerTypes[tower.type];
+  const combo = type.combo;
+  if (!combo || Math.random() >= combo.chance) return;
+
+  // Комбо не является паузой: оно выполняется внутри обычного игрового тика.
+  // Сохраняем состояние паузы и гарантируем, что само срабатывание комбо его не меняет.
+
+  if (tower.type === "pulse") {
+    const p = getRandomRoadPoint();
+    launchComboMine(tower, p, type.color);
+    return;
+  }
+
+  if (isSupportType(tower.type)) {
+    // Поддерживающий прибор: корпус + центральное ядро.
+    ctx.beginPath();
+    ctx.rect(tower.x - 17, tower.y - 17, 34, 34);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 10, 0, Math.PI * 2);
+    ctx.strokeStyle = "#d8ffe7";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = type.color;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Радиус усиления виден всегда, чтобы было понятно, какие башни получают бонус.
+    ctx.save();
+    ctx.setLineDash([6, 6]);
+    ctx.globalAlpha = 0.34 + 0.08 * Math.sin(performance.now() / 260);
+    ctx.strokeStyle = type.color;
+    ctx.shadowColor = type.color;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, type.range, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  } else if (tower.type === "rail") {
+    const targets = state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 4);
+    for (const enemy of targets) {
+      enemy.hp -= towerTypes.rail.damage * 2.2;
+      createLightning(tower, enemy);
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    return;
+  }
+
+  if (tower.type === "frost") {
+    for (const enemy of state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 7)) {
+      enemy.slowMultiplier = 0.08;
+      enemy.slowTimer = 3.5;
+      enemy.hp -= towerTypes.frost.damage * 3;
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    state.effects.push({ type: "comboBurst", x: tower.x, y: tower.y, radius: 110, life: 0.5, maxLife: 0.5, color: type.color });
+    return;
+  }
+
+  if (tower.type === "blast") {
+    const p = getRandomRoadPoint();
+    state.effects.push({ type: "comboBurst", x: p.x, y: p.y, radius: 125, life: 0.55, maxLife: 0.55, color: type.color });
+    for (const enemy of state.enemies) {
+      if (!enemy.dead && distance(enemy, p) <= 105) {
+        enemy.hp -= Math.max(80, enemy.maxHp * 0.72);
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+    return;
+  }
+
+  if (tower.type === "arc") {
+    const targets = state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 6);
+    for (const enemy of targets) {
+      enemy.hp -= towerTypes.arc.damage * 4.5;
+      createLightning(tower, enemy);
+      if (enemy.hp <= 0) killEnemy(enemy);
+    }
+    return;
+  }
+
+  if (tower.type === "titan") {
+    const target = state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance)[0];
+    if (!target) return;
+    for (const enemy of state.enemies) {
+      if (!enemy.dead && distance(enemy, target) <= 115) {
+        enemy.hp -= towerTypes.titan.damage * 2.8;
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+    createExplosion(target.x, target.y, type.color);
+    return;
+  }
+
+  if (tower.type === "nova") {
+    for (const enemy of state.enemies) {
+      if (!enemy.dead) {
+        enemy.hp -= enemy.maxHp * 0.42;
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+    state.effects.push({ type: "comboBurst", x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, radius: 260, life: 0.65, maxLife: 0.65, color: type.color });
+    return;
+  }
+
+  if (tower.type === "devastator") {
+    for (const enemy of state.enemies) {
+      if (!enemy.dead) {
+        enemy.hp -= enemy.maxHp * 0.58;
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+    state.effects.push({ type: "comboBurst", x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, radius: 320, life: 0.7, maxLife: 0.7, color: type.color });
+    return;
+  }
+
+  if (tower.type === "singularity") {
+    for (const enemy of state.enemies) {
+      if (!enemy.dead) {
+        enemy.hp -= enemy.maxHp * 0.75;
+        enemy.slowMultiplier = 0.12;
+        enemy.slowTimer = 4;
+        if (enemy.hp <= 0) killEnemy(enemy);
+      }
+    }
+    state.effects.push({ type: "comboBurst", x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2, radius: 360, life: 0.9, maxLife: 0.9, color: type.color });
+  }
+}
+
+function updateComboAbilities(dt) {
+  // Комбо проверяем не каждый кадр. Это снижает нагрузку и исключает
+  // ситуацию, когда большой набор башен/мобов может задержать игровой цикл.
+  state.comboCheckTimer = Math.max(0, (state.comboCheckTimer || 0) - dt);
+  if (state.comboCheckTimer > 0) return;
+  state.comboCheckTimer = 0.20;
+
+  try {
+    const groups = getComboGroups();
+    const activeLeaders = new Set();
+
+    for (const group of groups) {
+      const leader = group[0];
+      const combo = towerTypes[leader.type]?.combo;
+      if (!combo) continue;
+
+      activeLeaders.add(leader);
+      leader.comboTimer = Math.max(
+        0,
+        Number.isFinite(leader.comboTimer) ? leader.comboTimer : COMBO_CHECK_INTERVAL
+      );
+      leader.comboTimer -= 0.20;
+
+      if (leader.comboTimer <= 0) {
+        leader.comboTimer = combo.cooldown;
+        triggerCombo(group);
+      }
+    }
+
+    for (const tower of state.towers) {
+      if (!activeLeaders.has(tower) && (tower.damageLevel || 1) >= MAX_UPGRADE_LEVEL) {
+        tower.comboTimer = COMBO_CHECK_INTERVAL;
+      }
+    }
+  } catch (error) {
+    // Ошибка одного комбо никогда не должна останавливать основной игровой цикл.
+    console.error('Combo error:', error);
+    for (const tower of state.towers) {
+      tower.comboTimer = COMBO_CHECK_INTERVAL;
+    }
+  }
+}
+function updateMines(dt) {
+  for (const mine of state.mines) {
+    mine.life -= dt;
+    mine.pulse = (mine.pulse || 0) + dt;
+    const victims = state.enemies.filter(enemy => !enemy.dead && distance(enemy, mine) <= mine.radius);
+    if (mine.armed && victims.length) {
+      mine.armed = false;
+      const targets = victims.sort((a, b) => b.distance - a.distance).slice(0, 5);
+      for (const enemy of targets) {
+        enemy.hp = 0;
+        killEnemy(enemy);
+      }
+      createExplosion(mine.x, mine.y, mine.color);
+      state.effects.push({ type: "comboBurst", x: mine.x, y: mine.y, radius: 90, life: 0.45, maxLife: 0.45, color: mine.color });
+      mine.life = 0;
+    }
+  }
+  state.mines = state.mines.filter(mine => mine.life > 0);
+}
+
 function updateTowers(dt) {
+  updateComboAbilities(dt);
+
   for (const tower of state.towers) {
+    if (isSupportType(tower.type)) {
+      tower.cooldown = 0;
+      continue;
+    }
+
     if ((tower.speedLevel || 1) >= 6) {
       tower.speedOverdriveCheckTimer = Math.max(0, (tower.speedOverdriveCheckTimer ?? SPEED_OVERDRIVE_INTERVAL) - dt);
       if (tower.speedOverdriveCheckTimer <= 0) {
@@ -1140,29 +1546,15 @@ function updateTowers(dt) {
     }
     tower.cooldown -= dt;
 
-    if (tower.cooldown > 0) {
-      continue;
-    }
-
+    if (tower.cooldown > 0) continue;
     const target = findTarget(tower);
-
-    if (!target) {
-      continue;
-    }
-
-    createProjectile(
-        tower,
-        target
-    );
-
+    if (!target) continue;
+    createProjectile(tower, target);
     playShotSound(tower.type);
-
     const stats = getTowerStats(tower);
-
     tower.cooldown = stats.fireRate;
   }
 }
-
 
 /* =========================================================
    ЭФФЕКТЫ
@@ -1215,6 +1607,18 @@ function updateEffects(dt) {
           dt;
     }
 
+    if (effect.type === "comboBurst") {
+      effect.radius += (effect.radius / Math.max(effect.maxLife, 0.01)) * dt * 0.35;
+    }
+
+    if (effect.type === "minePlace") {
+      effect.radius = 8 + (1 - effect.life / effect.maxLife) * 24;
+    }
+
+    // Отрисовка эффектов выполняется только в drawEffects().
+    // Нельзя обращаться к canvas здесь: update() должен быть чистой симуляцией.
+    // Раньше здесь использовалась несуществующая переменная alpha, из-за чего
+    // при первом comboBurst игра падала с ReferenceError и игровое поле исчезало.
     if (effect.type === "cash") {
       effect.y += effect.velocityY * dt;
       effect.velocityY += 12 * dt;
@@ -1253,10 +1657,10 @@ function startWave() {
   state.spawning = true;
   state.nextWaveTimer = 2.25;
 
-  waveNameEl.textContent =
-      state.activeWaves.length > 1
-          ? `Волны ${state.activeWaves.map(w => w.waveNumber).join(' + ')}`
-          : `Волна ${waveNumber}`;
+  // Показываем только последнюю запущенную волну. Параллельные волны
+  // продолжают работать внутри state.activeWaves, но их номера не
+  // накапливаются в интерфейсе.
+  waveNameEl.textContent = `Волна ${waveNumber}`;
 
   setHint(
       state.activeWaves.length > 1
@@ -1312,7 +1716,8 @@ function updateWave(dt) {
     if (!spawning && !alive) {
       completed.push(wave.waveNumber);
       const reward = Math.round(
-          (25 + Math.floor(wave.waveNumber * 2.5)) *
+          (25 + Math.floor(Math.min(wave.waveNumber, 120) * 2.5) +
+           Math.sqrt(Math.max(0, wave.waveNumber - 120)) * 7) *
           getDifficulty().waveRewardMultiplier
       );
       state.money += reward;
@@ -1344,6 +1749,26 @@ function updateWave(dt) {
    УЛУЧШЕНИЕ
 ========================================================= */
 
+// Стоимость следующего уровня.
+// Важно: функция должна быть доступна и панели выбора, и обработчикам кнопок.
+function getUpgradeCost(tower, kind) {
+  if (!tower || !towerTypes[tower.type] || !["damage", "range", "speed"].includes(kind)) {
+    return Infinity;
+  }
+
+  const level = tower[`${kind}Level`] || 1;
+  if (level >= MAX_UPGRADE_LEVEL || isSupportType(tower.type)) {
+    return Infinity;
+  }
+
+  const baseCost = Number(towerTypes[tower.type].cost) || 0;
+  const kindMultiplier = { damage: 0.34, range: 0.28, speed: 0.32 }[kind];
+  // Первые уровни доступны относительно дёшево, дальше цена ускоренно растёт, как в классической прогрессии Onslaught.
+  const levelMultiplier = Math.pow(1.90, level - 1);
+
+  return Math.max(10, Math.ceil(baseCost * kindMultiplier * levelMultiplier / 5) * 5);
+}
+
 function upgradeTowerStat(kind) {
   const tower = state.selectedTower;
   if (!tower || !['damage', 'range', 'speed'].includes(kind)) {
@@ -1362,7 +1787,7 @@ function upgradeTowerStat(kind) {
     return;
   }
 
-  state.money -= cost;
+  spendMoney(cost);
   tower[`${kind}Level`] = (tower[`${kind}Level`] || 1) + 1;
   tower.totalSpent += cost;
 
@@ -1429,8 +1854,11 @@ function updateUi() {
   moneyEl.textContent =
       `$${Math.floor(state.money)}`;
 
-  livesEl.textContent =
-      Math.max(0, state.lives);
+  const lifeCount = Math.max(0, state.lives);
+  const maxLives = 12;
+  livesEl.innerHTML = Array.from({ length: maxLives }, (_, index) =>
+    `<span class="life-heart ${index < lifeCount ? "alive" : "lost"}" aria-hidden="true">♥</span>`
+  ).join("");
 
   waveEl.textContent =
       `${state.wave} ∞`;
@@ -1455,31 +1883,57 @@ function updateUi() {
     const damageLevel = tower.damageLevel || 1;
     const rangeLevel = tower.rangeLevel || 1;
     const speedLevel = tower.speedLevel || 1;
+    const booster = tower.type === "booster" ? { damage: 0, range: 0, speed: 0 } : getBoosterBonus(tower);
     const nextDamage = damageLevel < MAX_UPGRADE_LEVEL
-        ? Math.round(type.damage * (1 + damageLevel * 0.35))
+        ? Math.round(type.damage * (1 + damageLevel * 0.30) * (1 + booster.damage))
         : stats.damage;
     const nextRange = rangeLevel < MAX_UPGRADE_LEVEL
-        ? type.range + rangeLevel * 15
+        ? type.range + rangeLevel * 12 + booster.range
         : stats.range;
-    const nextFireRate = speedLevel < MAX_UPGRADE_LEVEL
-        ? Math.max(0.12, type.fireRate * Math.pow(0.92, speedLevel))
-        : stats.fireRate;
+    const currentSpeed = 1 / getProjectedFireRate(tower, speedLevel);
+    const nextSpeed = speedLevel < MAX_UPGRADE_LEVEL
+        ? 1 / getProjectedFireRate(tower, speedLevel + 1)
+        : currentSpeed;
 
-    const statRow = (label, kind, level, current, next, suffix = '') => {
+    const statRow = (label, kind, level, current, next) => {
       const bars = Array.from({ length: MAX_UPGRADE_LEVEL }, (_, index) => {
         const n = index + 1;
         const filled = n <= level;
         const preview = n === level + 1 && level < MAX_UPGRADE_LEVEL;
         return `<span class="stat-bar ${filled ? `filled ${kind}` : ''} ${preview ? `preview ${kind}` : ''}" title="${n === level ? `Текущий уровень: ${level}` : preview ? `Следующий уровень: ${level + 1}` : `Уровень ${n}`}" aria-hidden="true"></span>`;
       }).join('');
+      const fmt = value => kind === 'speed' ? Number(value).toFixed(2) : Math.round(value);
+      const valueText = level >= MAX_UPGRADE_LEVEL
+        ? `${label}: ${fmt(current)}`
+        : `${label}: ${fmt(current)} → ${fmt(next)} <span>(+${fmt(Number(next) - Number(current))})</span>`;
       return `
         <div class="stat-preview">
           <span class="stat-preview-label">${label}</span>
-          <div class="stat-bars" aria-label="${label}: уровень ${level} из ${MAX_UPGRADE_LEVEL}${level < MAX_UPGRADE_LEVEL ? `, следующий уровень ${level + 1}` : ', максимум'}">${bars}</div>
+          <div class="stat-bars-wrap">
+            <div class="stat-bars" aria-label="${label}: уровень ${level} из ${MAX_UPGRADE_LEVEL}${level < MAX_UPGRADE_LEVEL ? `, следующий уровень ${level + 1}` : ', максимум'}">${bars}</div>
+            <div class="stat-value stat-value-${kind}">${valueText}</div>
+          </div>
         </div>`;
     };
 
-    selectionInfo.innerHTML = `
+    if (tower.type === "booster") {
+      selectionInfo.innerHTML = `
+        <div class="selection-title-row">
+          <strong>${type.name}</strong>
+          <span class="selection-cost">$${Math.floor(tower.totalSpent || type.cost)}</span>
+        </div>
+        <p>${type.description || "Поддерживающий модуль"}</p>
+        <p>Радиус действия: ${Math.round(type.range)}</p>
+      `;
+      upgradeBtn.textContent = type.name;
+      rangeBtn.textContent = "Радиус +";
+      speedBtnUpgrade.textContent = "Скорость +";
+      upgradeBtn.disabled = true;
+      rangeBtn.disabled = true;
+      speedBtnUpgrade.disabled = true;
+      sellBtn.disabled = false;
+    } else {
+      selectionInfo.innerHTML = `
       <div class="selection-title-row">
         <strong>${type.name}</strong>
         <span class="selection-cost">$${Math.floor(tower.totalSpent || type.cost)}</span>
@@ -1488,7 +1942,7 @@ function updateUi() {
       <div class="stat-preview-list">
         ${statRow('Урон', 'damage', damageLevel, stats.damage, nextDamage)}
         ${statRow('Радиус', 'range', rangeLevel, Math.round(stats.range), Math.round(nextRange))}
-        ${statRow('Темп', 'speed', speedLevel, stats.fireRate.toFixed(2), nextFireRate.toFixed(2), 'с')}
+        ${statRow('Скорость', 'speed', speedLevel, currentSpeed, nextSpeed)}
       </div>
     `;
 
@@ -1500,26 +1954,65 @@ function updateUi() {
     rangeBtn.disabled = rangeCost === Infinity || state.money < rangeCost;
     speedBtnUpgrade.disabled = speedCost === Infinity || state.money < speedCost;
     sellBtn.disabled = false;
+    }
   } else {
     const type = state.selectedType
         ? towerTypes[state.selectedType]
         : null;
 
-    selectionInfo.innerHTML = type
-        ? `
-            <div class="selection-title-row">
-              <strong>${type.name}</strong>
-              <span class="selection-cost">$${type.cost}</span>
+    if (type) {
+      const previewTower = {
+        type: state.selectedType,
+        damageLevel: 1,
+        rangeLevel: 1,
+        speedLevel: 1,
+        speedOverdrive: false,
+        x: state.previewX || 0,
+        y: state.previewY || 0
+      };
+      const previewStats = getTowerStats(previewTower);
+      const previewDamage = Math.round(type.damage * 1.30);
+      const previewRange = Math.round(type.range + 12);
+      const previewSpeed = 1 / getProjectedFireRate(previewTower, 1);
+      const nextPreviewSpeed = 1 / getProjectedFireRate(previewTower, 2);
+      const previewStatRow = (label, kind, current, next) => {
+        const fmt = value => kind === 'speed' ? Number(value).toFixed(2) : Math.round(value);
+        return `
+          <div class="stat-preview">
+            <span class="stat-preview-label">${label}</span>
+            <div class="stat-bars-wrap">
+              <div class="stat-bars" aria-label="${label}: уровень 1 из ${MAX_UPGRADE_LEVEL}">
+                ${Array.from({ length: MAX_UPGRADE_LEVEL }, (_, index) => `<span class="stat-bar ${index === 0 ? `filled ${kind}` : index === 1 ? `preview ${kind}` : ''}" aria-hidden="true"></span>`).join('')}
+              </div>
+              <div class="stat-value stat-value-${kind}">${label}: ${fmt(current)} → ${fmt(next)} <span>(+${fmt(Number(next) - Number(current))})</span></div>
             </div>
-            <p>Выберите место на поле для установки.</p>
-          `
-        : `
-            <div class="selection-title-row">
-              <strong>Башня не выбрана</strong>
-              <span class="selection-cost">—</span>
-            </div>
-            <p>Выберите башню справа для установки.</p>
-          `;
+          </div>`;
+      };
+
+      selectionInfo.innerHTML = `
+        <div class="selection-title-row">
+          <strong>${type.name}</strong>
+          <span class="selection-cost">$${type.cost}</span>
+        </div>
+        <p>Улучшения после установки · следующий уровень подсвечен пунктиром</p>
+        ${isSupportType(type.name === 'Усилитель' ? 'booster' : state.selectedType)
+          ? `<p>${type.description || 'Поддерживающий модуль'} · радиус ${Math.round(type.range)}</p>`
+          : `<div class="stat-preview-list">
+              ${previewStatRow('Урон', 'damage', previewStats.damage, previewDamage)}
+              ${previewStatRow('Радиус', 'range', Math.round(previewStats.range), previewRange)}
+              ${previewStatRow('Скорость', 'speed', previewSpeed, nextPreviewSpeed)}
+            </div>`}
+        <p>Выберите место на поле для установки.</p>
+      `;
+    } else {
+      selectionInfo.innerHTML = `
+        <div class="selection-title-row">
+          <strong>Башня не выбрана</strong>
+          <span class="selection-cost">—</span>
+        </div>
+        <p>Выберите башню справа для установки.</p>
+      `;
+    }
 
     upgradeBtn.textContent = "Урон +";
     rangeBtn.textContent = "Радиус +";
@@ -1655,65 +2148,46 @@ canvas.addEventListener("mouseleave", () => {
    ВЫБОР ТИПА БАШНИ
 ========================================================= */
 
-towerList.addEventListener(
-    "click",
-    (event) => {
-      const button =
-          event.target.closest(
-              ".tower-card"
-          );
+function selectTowerFromCard(event) {
+  const button = event.target.closest(".tower-card");
+  if (!button) return;
 
-      if (!button) {
-        return;
-      }
+  const type = button.dataset.tower;
+  if (!towerTypes[type]) return;
 
-      const type =
-          button.dataset.tower;
+  if (!isTowerUnlocked(type)) {
+    setHint(`Эта башня ещё не разблокирована. Нужна ${towerTypes[type].unlockWave}-я волна.`);
+    return;
+  }
 
-      if (!towerTypes[type]) {
-        return;
-      }
+  const wasSelected = state.selectedType === type;
+  state.selectedTower = null;
+  state.selectedType = wasSelected ? null : type;
 
-      if (!isTowerUnlocked(type)) {
-        setHint(`Эта башня ещё не разблокирована. Нужна ${towerTypes[type].unlockWave}-я волна.`);
-        return;
-      }
+  document.querySelectorAll(".tower-card[data-tower]").forEach(card => {
+    card.classList.toggle("active", !wasSelected && card === button);
+  });
 
-      const wasSelected = state.selectedType === type;
+  state.previewValid = !wasSelected && !!state.selectedType && canPlaceTower(state.previewX, state.previewY);
+  setHint(wasSelected ? "Выбор башни снят. Теперь ни одна башня не выбрана." : `${towerTypes[type].name}: выберите место вне дороги.`);
+  updateUi();
+}
 
-      state.selectedTower = null;
+towerList.addEventListener("click", selectTowerFromCard);
+if (boostList) boostList.addEventListener("click", selectTowerFromCard);
 
-      if (wasSelected) {
-        state.selectedType = null;
-      } else {
-        state.selectedType = type;
-      }
+function setPanelCategory(category) {
+  const showBoosts = category === "boosts";
+  towerList.classList.toggle("hidden", showBoosts);
+  boostList?.classList.toggle("hidden", !showBoosts);
+  towersTab?.classList.toggle("active", !showBoosts);
+  boostsTab?.classList.toggle("active", showBoosts);
+  towersTab?.setAttribute("aria-selected", String(!showBoosts));
+  boostsTab?.setAttribute("aria-selected", String(showBoosts));
+}
 
-      document
-          .querySelectorAll(
-              ".tower-card"
-          )
-          .forEach(card => {
-            card.classList.toggle(
-                "active",
-                !wasSelected && card === button
-            );
-          });
-
-      if (wasSelected) {
-        state.previewValid = false;
-        setHint(
-            "Выбор башни снят. Теперь ни одна башня не выбрана."
-        );
-      } else {
-        setHint(
-            `${towerTypes[type].name}: выберите место вне дороги.`
-        );
-      }
-
-      updateUi();
-    }
-);
+towersTab?.addEventListener("click", () => setPanelCategory("towers"));
+boostsTab?.addEventListener("click", () => setPanelCategory("boosts"));
 
 
 /* =========================================================
@@ -1778,10 +2252,6 @@ function setPaused(paused) {
           ? "Продолжить"
           : "Пауза";
 
-  if (pauseOverlay) {
-    pauseOverlay.classList.toggle("hidden", !state.paused);
-  }
-
   if (!state.paused) {
     state.lastTime = performance.now();
   }
@@ -1826,6 +2296,18 @@ startGameBtn.addEventListener(
     startGame
 );
 
+if (devInfiniteMoneyBtn) {
+  devInfiniteMoneyBtn.addEventListener("click", () => {
+    DEV_INFINITE_MONEY = !DEV_INFINITE_MONEY;
+    updateDevMoneyButton();
+    if (DEV_INFINITE_MONEY) {
+      state.money = TEST_MONEY;
+      updateUi();
+    }
+  });
+  updateDevMoneyButton();
+}
+
 if (volumeSlider) {
   applyAudioVolume();
   volumeSlider.addEventListener("input", () => {
@@ -1859,14 +2341,28 @@ function closeSettings() {
 
 function toggleSettings() {
   if (!settingsPanel || !settingsBtn) return;
+  if (state.gameOver) {
+    closeSettings();
+    return;
+  }
   const isOpen = !settingsPanel.classList.contains("hidden");
   settingsPanel.classList.toggle("hidden", isOpen);
   settingsBtn.setAttribute("aria-expanded", String(!isOpen));
 }
 
+function setGameOverUi(isGameOver) {
+  if (!gameScreen || !settingsBtn || !settingsWidget) return;
+  gameScreen.classList.toggle("game-over-active", isGameOver);
+  settingsBtn.disabled = isGameOver;
+  settingsBtn.setAttribute("aria-disabled", String(isGameOver));
+  settingsBtn.tabIndex = isGameOver ? -1 : 0;
+  if (isGameOver) closeSettings();
+}
+
 if (settingsBtn) {
   settingsBtn.addEventListener("click", (event) => {
     event.stopPropagation();
+    if (state.gameOver) return;
     ensureAudio();
     toggleSettings();
   });
@@ -1936,6 +2432,7 @@ if (endMenuBtn) {
   endMenuBtn.addEventListener("click", () => {
     ensureAudio();
     endModal.classList.add("hidden");
+    setGameOverUi(false);
     showMainMenu();
   });
 }
@@ -1944,12 +2441,9 @@ if (newGameBtn) {
   newGameBtn.addEventListener("click", startNewGame);
 }
 
-window.addEventListener("beforeunload", () => {
-  // Сохраняем именно активную игру при закрытии/обновлении страницы.
-  if (!state.gameOver && !gameScreen.classList.contains("hidden")) {
-    saveGame();
-  }
-});
+// Намеренно НЕ сохраняем игру при обновлении/закрытии страницы.
+// «Продолжить игру» появляется только после явного выхода в главное меню
+// из активной партии.
 
 
 /* =========================================================
@@ -2195,6 +2689,39 @@ function drawCore() {
    БАШНИ
 ========================================================= */
 
+function drawComboLinks(groups) {
+  if (!groups || !groups.length) return;
+
+  const now = performance.now();
+  const pulse = 0.45 + 0.2 * Math.sin(now / 180);
+
+  ctx.save();
+  ctx.setLineDash([8, 7]);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+
+  for (const group of groups) {
+    if (group.length < 3) continue;
+    const type = towerTypes[group[0].type];
+    ctx.strokeStyle = type.color;
+    ctx.shadowColor = type.color;
+    ctx.shadowBlur = 12;
+    ctx.globalAlpha = pulse;
+
+    // Соединяем все башни группы. Это также работает для цепных групп,
+    // где первая и третья башня могут быть дальше COMBO_RADIUS друг от друга.
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        ctx.beginPath();
+        ctx.moveTo(group[i].x, group[i].y);
+        ctx.lineTo(group[j].x, group[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 function drawTower(tower) {
   const type =
       towerTypes[tower.type];
@@ -2210,6 +2737,21 @@ function drawTower(tower) {
   }
 
   drawTowerUpgradeVisual(tower, type);
+
+  const comboReady = (state.comboReadyTowers && state.comboReadyTowers.has(tower)) || false;
+  if (comboReady) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(performance.now() / 180);
+    ctx.strokeStyle = type.color;
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = type.color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 6]);
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 29, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   /*
    * Свечение.
@@ -2570,6 +3112,7 @@ function drawTowerUpgradeVisual(tower, type) {
   const colors = ["#ff4055", "#ffd43b", "#35d9ff"];
   const selected = tower === state.selectedTower;
   const allMax = levels.every(level => level >= MAX_UPGRADE_LEVEL);
+  const comboReady = (state.comboReadyTowers && state.comboReadyTowers.has(tower)) || false;
 
   ctx.save();
 
@@ -2729,36 +3272,109 @@ function drawPlacementPreview() {
    ОТРИСОВКА
 ========================================================= */
 
-function draw() {
-  ctx.clearRect(
-      0,
-      0,
-      GAME_WIDTH,
-      GAME_HEIGHT
-  );
-
-  drawBackground();
-
-  drawRoad();
-
-  drawCore();
-
-  for (const tower of state.towers) {
-    drawTower(tower);
+function drawFallbackField() {
+  // Всегда оставляем пользователю видимое поле даже если отдельный эффект
+  // отрисовки оказался повреждён. Это не вмешивается в симуляцию.
+  ctx.save();
+  ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  ctx.fillStyle = '#07101b';
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  ctx.strokeStyle = 'rgba(80, 180, 255, 0.07)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= GAME_WIDTH; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GAME_HEIGHT); ctx.stroke();
   }
-
-  for (const enemy of state.enemies) {
-    drawEnemy(enemy);
+  for (let y = 0; y <= GAME_HEIGHT; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(GAME_WIDTH, y); ctx.stroke();
   }
-
-  for (const projectile of state.projectiles) {
-    drawProjectile(projectile);
+  if (Array.isArray(path) && path.length > 1) {
+    ctx.strokeStyle = 'rgba(40, 220, 255, 0.20)';
+    ctx.lineWidth = 72;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    ctx.stroke();
   }
-
-  drawPlacementPreview();
-  drawEffects();
+  ctx.restore();
 }
 
+function draw() {
+  try {
+    ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    drawBackground();
+    drawRoad();
+    drawCore();
+
+    // Пунктирные связи показывают все башни, входящие в готовую комбинацию.
+    const comboGroupsForDraw = getComboGroups();
+    state.comboReadyTowers = new Set(comboGroupsForDraw.flat());
+    drawComboLinks(comboGroupsForDraw);
+
+    for (const tower of state.towers) drawTower(tower);
+    for (const enemy of state.enemies) drawEnemy(enemy);
+    for (const projectile of state.projectiles) drawProjectile(projectile);
+
+    for (const projectile of state.comboProjectiles) {
+      const t = Math.max(0, Math.min(1, projectile.progress));
+      const alpha = Math.max(0.25, 1 - t * 0.45);
+      const vx = projectile.targetX - projectile.startX;
+      const vy = projectile.targetY - projectile.startY;
+      const len = Math.hypot(vx, vy) || 1;
+      const nx = vx / len;
+      const ny = vy / len;
+      ctx.save();
+      ctx.globalAlpha = 0.22 * alpha;
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.ellipse(projectile.x, projectile.y + 10, 10 + Math.sin(t * Math.PI) * 7, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.32 * alpha;
+      ctx.strokeStyle = projectile.color;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = projectile.color;
+      ctx.beginPath();
+      ctx.moveTo(projectile.x - nx * 24, projectile.y - ny * 24);
+      ctx.lineTo(projectile.x, projectile.y);
+      ctx.stroke();
+      ctx.globalAlpha = alpha;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = projectile.color;
+      ctx.fillStyle = projectile.color;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(projectile.x, projectile.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
+    drawPlacementPreview();
+
+    for (const mine of state.mines) {
+      const lifeAlpha = Math.max(0.35, Math.min(1, mine.life / Math.max(0.01, mine.maxLife)));
+      const pulse = (Math.sin((mine.pulse || 0) * 5) + 1) * 0.5;
+      ctx.save();
+      ctx.globalAlpha = lifeAlpha;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = mine.color;
+      ctx.fillStyle = '#101827';
+      ctx.strokeStyle = mine.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(mine.x, mine.y, 9 + pulse * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = mine.color;
+      ctx.beginPath(); ctx.arc(mine.x, mine.y, 3 + pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.18 + pulse * 0.35;
+      ctx.beginPath(); ctx.arc(mine.x, mine.y, 13 + pulse * 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    drawEffects();
+  } catch (error) {
+    console.error('Render error:', error);
+    drawFallbackField();
+  }
+}
 
 /* =========================================================
    ИГРОВОЙ ЦИКЛ
@@ -2775,6 +3391,8 @@ function update(dt) {
   }
 
   updateTowers(dt);
+  updateComboProjectiles(dt);
+  updateMines(dt);
 
   for (const projectile of state.projectiles) {
     updateProjectile(
@@ -2800,43 +3418,38 @@ function update(dt) {
 }
 
 function gameLoop(timestamp) {
-  if (!state.lastTime) {
-    state.lastTime =
-        timestamp;
-  }
+  if (!state.lastTime) state.lastTime = timestamp;
+  let dt = (timestamp - state.lastTime) / 1000;
+  state.lastTime = timestamp;
+  dt = Math.min(Math.max(dt, 0), 0.05);
 
-  let dt =
-      (timestamp -
-          state.lastTime) /
-      1000;
-
-  state.lastTime =
-      timestamp;
-
-  dt = Math.min(
-      dt,
-      0.05
-  );
-
-  if (
-      !state.paused &&
-      !state.gameOver
-  ) {
-    update(
-        dt *
-        state.speed
-    );
+  if (!state.paused && !state.gameOver) {
+    try {
+      update(dt * state.speed);
+    } catch (error) {
+      // Критическая ошибка симуляции не должна убивать requestAnimationFrame.
+      console.error('Game update error:', error);
+      state.comboProjectiles = [];
+      state.effects = Array.isArray(state.effects) ? state.effects : [];
+      state.mines = Array.isArray(state.mines) ? state.mines : [];
+      state.towers = Array.isArray(state.towers) ? state.towers : [];
+      state.enemies = Array.isArray(state.enemies) ? state.enemies : [];
+      state.projectiles = Array.isArray(state.projectiles) ? state.projectiles : [];
+    }
   }
 
   draw();
 
-  updateUi();
+  if (!state.paused && !state.gameOver) {
+    state.uiRefreshTimer = (state.uiRefreshTimer || 0) - dt;
+    if (state.uiRefreshTimer <= 0) {
+      state.uiRefreshTimer = 0.10;
+      try { updateUi(); } catch (error) { console.error('UI error:', error); }
+    }
+  }
 
-  requestAnimationFrame(
-      gameLoop
-  );
+  requestAnimationFrame(gameLoop);
 }
-
 
 /* =========================================================
    КОНЕЦ ИГРЫ
@@ -2869,6 +3482,7 @@ function endGame(win) {
         `Жизни закончились. Сбито врагов: ${state.kills}.`;
   }
 
+  setGameOverUi(true);
   endModal.classList.remove(
       "hidden"
   );
@@ -2926,10 +3540,11 @@ const LEGACY_SAVE_KEYS = [
 ];
 let hasStartedGame = false;
 
-// Старое сохранение предыдущей версии не считается активным прогрессом.
-// Это важно для первого запуска новой версии: «Продолжить игру» не появляется
-// только потому, что браузер сохранил тестовое состояние старой версии.
+// При каждом новом запуске страницы начинаем с чистого меню.
+// Сохранение может появиться только после того, как пользователь реально
+// начал игру и сам вышел в главное меню через кнопку игры.
 try {
+  localStorage.removeItem(SAVE_KEY);
   for (const legacyKey of LEGACY_SAVE_KEYS) {
     localStorage.removeItem(legacyKey);
   }
@@ -2976,6 +3591,7 @@ function saveGame() {
       wave: state.wave,
       kills: state.kills,
       towers: state.towers,
+      mines: state.mines,
       enemies: state.enemies,
       waveActive: state.waveActive,
       spawning: state.spawning,
@@ -3038,11 +3654,16 @@ function loadGame() {
     path = maps[currentMap].path;
     PATH_LENGTH = totalPathLength();
 
-    state.money = Number.isFinite(save.money) ? save.money : 170;
+    state.money = DEV_INFINITE_MONEY ? TEST_MONEY : (Number.isFinite(save.money) ? save.money : 170);
     state.lives = Number.isFinite(save.lives) ? save.lives : 12;
     state.wave = Number.isFinite(save.wave) ? save.wave : 0;
     state.kills = Number.isFinite(save.kills) ? save.kills : 0;
     state.towers = Array.isArray(save.towers) ? save.towers : [];
+    for (const tower of state.towers) {
+      tower.comboTimer = Number.isFinite(tower.comboTimer) ? tower.comboTimer : COMBO_CHECK_INTERVAL;
+    }
+    state.mines = Array.isArray(save.mines) ? save.mines : [];
+    state.comboProjectiles = [];
     state.enemies = Array.isArray(save.enemies) ? save.enemies : [];
     state.projectiles = [];
     state.effects = [];
@@ -3060,6 +3681,7 @@ function loadGame() {
     state.previewValid = false;
     state.paused = false;
     state.gameOver = false;
+    state.uiRefreshTimer = 0;
 
     selectDifficulty(currentDifficulty);
     selectMap(currentMap);
@@ -3081,17 +3703,40 @@ function loadGame() {
 }
 
 function showMainMenu() {
-  if (!state.gameOver) {
+  // Единственный штатный способ создать сохранение для «Продолжить игру» —
+  // выйти из уже начатой активной партии через кнопку главного меню.
+  if (hasStartedGame && !state.gameOver && !gameScreen.classList.contains("hidden")) {
     saveGame();
   }
+
   state.paused = true;
+
+  // В меню не должно быть ни симуляции, ни звуков игрового процесса.
+  try {
+    if (audioContext && audioContext.state === "running") {
+      audioContext.suspend();
+    }
+  } catch (error) {
+    // Аудио может быть недоступно.
+  }
+
   endModal.classList.add("hidden");
   gameScreen.classList.add("hidden");
   mainMenu.classList.remove("hidden");
   updateResumeButton();
 }
 
+function updateDevMoneyButton() {
+  if (!devInfiniteMoneyBtn) return;
+  devInfiniteMoneyBtn.textContent = DEV_INFINITE_MONEY
+    ? "DEV: ∞ GOLD — ВКЛ"
+    : "DEV: ∞ GOLD — ВЫКЛ";
+  devInfiniteMoneyBtn.classList.toggle("active", DEV_INFINITE_MONEY);
+  devInfiniteMoneyBtn.setAttribute("aria-pressed", String(DEV_INFINITE_MONEY));
+}
+
 function startGame() {
+  setGameOverUi(false);
   ensureAudio();
   if (hasSavedGame()) {
     if (!loadGame()) {
@@ -3110,6 +3755,7 @@ function startGame() {
 }
 
 function startNewGame() {
+  setGameOverUi(false);
   ensureAudio();
   clearSavedGame();
   restartGame();
@@ -3122,14 +3768,17 @@ function startNewGame() {
 }
 
 function restartGame() {
+  setGameOverUi(false);
   state.sessionId = state.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  state.money = 170;
+  state.money = DEV_INFINITE_MONEY ? TEST_MONEY : 170;
   state.lives = 12;
 
   state.wave = 0;
   state.kills = 0;
 
   state.towers = [];
+  state.mines = [];
+  state.comboProjectiles = [];
   state.enemies = [];
   state.projectiles = [];
   state.effects = [];
@@ -3160,6 +3809,8 @@ function restartGame() {
   state.speed = 1;
 
   state.gameOver = false;
+  state.uiRefreshTimer = 0;
+  state.comboCheckTimer = 0;
 
   pauseBtn.textContent =
       "Пауза";
@@ -3211,7 +3862,9 @@ setHint(
 
 updateUi();
 
-// Главное меню открывается при запуске.
+// Главное меню открывается при запуске. Игровая симуляция и звук в меню
+// полностью остановлены до нажатия «Новая игра».
+state.paused = true;
 gameScreen.classList.add("hidden");
 mainMenu.classList.remove("hidden");
 updateResumeButton();

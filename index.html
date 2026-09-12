@@ -54,6 +54,7 @@
         </div>
 
         <button id="startGameBtn" class="menu-start primary">Новая игра</button>
+        <button id="devInfiniteMoneyBtn" class="dev-money-btn" type="button" aria-pressed="false">DEV: ∞ GOLD — ВЫКЛ</button>
         <button id="newGameBtn" class="menu-new hidden">Новая игра</button>
         <p class="menu-tip">Совет: нажмите на выбранную башню справа ещё раз, чтобы снять её выбор.</p>
       </div>
@@ -66,7 +67,7 @@
         </div>
         <div class="status-strip" aria-label="Статистика">
           <div class="cash-status"><span id="money">$170</span><small>CASH</small></div>
-          <div class="lives-status"><span id="lives">12</span><small>LIVES</small></div>
+          <div class="lives-status" aria-label="Жизни"><div id="lives" class="heart-lives" aria-live="polite"></div><small>ЖИЗНИ</small></div>
           <div><span id="wave">0 ∞</span><small>волна</small></div>
           <div><span id="kills">0</span><small>сбито</small></div>
         </div>
@@ -81,10 +82,13 @@
         </section>
 
         <aside class="panel" aria-label="Управление">
-          <section class="panel-section">
-            <h2>Башни</h2>
+          <section class="panel-section tower-panel-section">
+            <div class="panel-switch" role="tablist" aria-label="Категория объектов">
+              <button id="towersTab" class="panel-switch-btn active" type="button" role="tab" aria-selected="true">Башни</button>
+              <button id="boostsTab" class="panel-switch-btn" type="button" role="tab" aria-selected="false">Усиления</button>
+            </div>
             <div class="tower-list" id="towerList">
-              <button class="tower-card active" data-tower="pulse">
+<button class="tower-card active" data-tower="pulse">
                 <svg class="tower-icon pulse" viewBox="0 0 40 40" aria-hidden="true">
                   <circle class="icon-bg" cx="20" cy="20" r="15" />
                   <circle class="icon-stroke" cx="20" cy="20" r="8" />
@@ -172,6 +176,33 @@
                 <strong><span class="cash-price">???</span></strong>
               </button>
             </div>
+            <div class="boost-list hidden" id="boostList">
+              <button class="tower-card support-card locked mystery" data-tower="booster" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v7M20 29v7M4 20h7M29 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+15% урон · +10 радиус · +8% скорость">Открывается с 30-й волны</span><span class="tower-unlock"></span></span>
+                <strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="overcharger" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><path class="icon-stroke" d="M20 6v28M6 20h28M11 11l18 18M29 11 11 29" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+18% скорость · +5% урон">Открывается с 90-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="range_amp" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><circle class="icon-stroke" cx="20" cy="20" r="6" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+35 радиус · +8% урон">Открывается с 120-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="reactor" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><path class="icon-stroke" d="M20 5v30M5 20h30" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+15% урон · +12% скорость">Открывается с 200-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="nexus" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="16" /><path class="icon-stroke" d="M20 4v32M4 20h32M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+20% урон · +25 радиус · +10% скорость">Открывается с 400-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <div class="boost-info">
+                <strong>Модули поддержки</strong>
+                <span>Новые усиления открываются по мере прохождения волн и складываются в зоне действия.</span>
+              </div>
+            </div>
           </section>
 
           <section class="panel-section wave-control-section">
@@ -240,7 +271,10 @@
       <div class="modal-card">
         <h2 id="endTitle">Игра окончена</h2>
         <p id="endText">Жизни закончились.</p>
-        <button id="restartBtn" class="primary">Играть снова</button>
+        <div class="modal-actions">
+          <button id="restartBtn" class="primary">Начать заново</button>
+          <button id="endMenuBtn" class="menu-back">Выйти в меню</button>
+        </div>
       </div>
     </div>
 

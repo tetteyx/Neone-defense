@@ -1,3 +1,7 @@
+Neon Bridge Defense v52
+
+Баланс прокачки переработан в сторону более плавной прогрессии. Усиления разблокируются на 30, 90, 120, 200 и 400 волнах. Добавлены Разгонщик, Дальний модуль, Реактор и Нексус.
+
 # Neon Bridge Defense
 
 Бесконечная браузерная Tower Defense игра на HTML, CSS и JavaScript.
@@ -46,3 +50,6 @@
 - **Весь экран** — переключает полноэкранный режим браузера.
 - **Громкость** — регулируется прямо в игре и сохраняется между запусками.
 - Игровое поле расширено для комфортной работы с правой панелью управления.
+
+## Combo abilities
+Inspired by the original Onslaught 2 combo system: nearby towers with max damage can trigger special combo attacks. In this version, a combo activates when at least three same-type towers with max damage are within combo range. Each tower type has its own special ability and chance/cooldown. Pulse towers create random road mines with a 40% chance every 5 seconds.
