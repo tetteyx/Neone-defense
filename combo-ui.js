@@ -93,7 +93,15 @@
           const url=typeof args[0]==='string'?args[0]:args[0]?.url||'';
           if(url.includes('game-core.js')){
             return response.clone().text().then(source=>{
-              const patched=source.replace(/\.sort\(\(a, b\) => b\.distance - a\.distance\)\.slice\(0, 5\)/g,'.sort((a, b) => b.distance - a.distance)');
+              let patched=source.replace(/\.sort\(\(a, b\) => b\.distance - a\.distance\)\.slice\(0, 5\)/g,'.sort((a, b) => b.distance - a.distance)');
+
+              // VERSION 83: дорога заканчивается ровно у левой грани CORE.
+              // Поэтому существующая логика потери жизни срабатывает в момент входа моба в CORE.
+              patched=patched
+                .replace(/\{ x: 1040, y: 220 \}/g,'{ x: 846, y: 220 }')
+                .replace(/\{ x: 1040, y: 500 \}/g,'{ x: 846, y: 500 }')
+                .replace(/\{ x: 1040, y: 300 \}/g,'{ x: 846, y: 300 }');
+
               if(patched!==source) return new Response(patched,{status:response.status,statusText:response.statusText,headers:response.headers});
               return response;
             });
