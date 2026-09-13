@@ -81,7 +81,7 @@
         <div class="status-strip" aria-label="Статистика">
           <div class="cash-status"><span id="money">$170</span><small>CASH</small></div>
           <div class="lives-status" aria-label="Жизни"><div id="lives" class="heart-lives" aria-live="polite"></div><small>ЖИЗНИ</small></div>
-          <div class="wave-status"><span id="wave">0 ∞</span><small>волна</small><span id="kills">0</span><small>сбито</small></div>
+          <div class="wave-status"><div class="wave-stat"><small>WAVE</small><span id="wave">0 ∞</span></div><div class="wave-stat"><small>KILLS</small><span id="kills">0</span></div></div>
         </div>
       </header>
 
@@ -101,113 +101,75 @@
             </div>
             <div class="tower-list" id="towerList">
 <button class="tower-card active" data-tower="pulse">
-                <svg class="tower-icon pulse" viewBox="0 0 40 40" aria-hidden="true">
-                  <circle class="icon-bg" cx="20" cy="20" r="15" />
-                  <circle class="icon-stroke" cx="20" cy="20" r="8" />
-                  <path class="icon-stroke" d="M20 7v8M20 25v8M7 20h8M25 20h8" />
-                  <circle class="icon-fill" cx="20" cy="20" r="3" />
-                </svg>
+                <svg class="tower-icon pulse" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 7v8M20 25v8M7 20h8M25 20h8" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>
                 <span class="tower-copy"><b>Импульс</b><span>быстро стреляет</span></span>
                 <strong><span class="cash-price">$55</span></strong>
               </button>
               <button class="tower-card" data-tower="rail">
-                <svg class="tower-icon rail" viewBox="0 0 40 40" aria-hidden="true">
-                  <path class="icon-bg" d="M8 27 27 8l5 5-19 19H8z" />
-                  <path class="icon-stroke" d="M13 27 30 10M18 32l14-14M9 22l9 9" />
-                  <circle class="icon-fill" cx="30" cy="10" r="3" />
-                </svg>
+                <svg class="tower-icon rail" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M8 29 29 8M13 32 32 13M10 20h10M20 10v10" /><circle class="icon-fill" cx="29" cy="8" r="3" /></svg>
                 <span class="tower-copy"><b>Рельсотрон</b><span>дальняя дистанция</span></span>
                 <strong><span class="cash-price">$85</span></strong>
               </button>
               <button class="tower-card" data-tower="frost">
-                <svg class="tower-icon frost" viewBox="0 0 40 40" aria-hidden="true">
-                  <circle class="icon-bg" cx="20" cy="20" r="14" />
-                  <path class="icon-stroke" d="M20 7v26M7 20h26M11 11l18 18M29 11 11 29" />
-                  <circle class="icon-fill" cx="20" cy="20" r="3" />
-                </svg>
+                <svg class="tower-icon frost" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><path class="icon-stroke" d="M20 5v30M5 20h30M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>
                 <span class="tower-copy"><b>Криоузел</b><span>замедляет врагов</span></span>
                 <strong><span class="cash-price">$75</span></strong>
               </button>
               <button class="tower-card" data-tower="blast">
-                <svg class="tower-icon blast" viewBox="0 0 40 40" aria-hidden="true">
-                  <path class="icon-bg" d="M20 5 24 15 35 12 28 21 34 31 23 28 20 36 16 27 6 31 12 21 5 13 16 15z" />
-                  <path class="icon-stroke" d="M20 11v8M20 25v4M12 20h6M22 20h6" />
-                  <circle class="icon-fill" cx="20" cy="20" r="3" />
-                </svg>
+                <svg class="tower-icon blast" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><path class="icon-stroke" d="M20 5v7M20 28v7M5 20h7M28 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
                 <span class="tower-copy"><b>Разлом</b><span>урон по области</span></span>
                 <strong><span class="cash-price">$110</span></strong>
               </button>
               <button class="tower-card" data-tower="arc">
-                <svg class="tower-icon arc" viewBox="0 0 40 40" aria-hidden="true">
-                  <path class="icon-bg" d="M23 4 9 22h10l-3 14 15-20H21z" />
-                  <path class="icon-stroke" d="M9 29c5-6 9-6 14 0 3 4 6 4 9 0" />
-                  <path class="icon-stroke" d="M22 7 13 20h9l-3 12" />
-                </svg>
+                <svg class="tower-icon arc" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><path class="icon-stroke" d="M7 27c5-7 9-7 13 0 4 7 8 7 13 0M11 13c4-5 8-5 12 0 3 4 5 4 7 1" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>
                 <span class="tower-copy"><b>Дуга</b><span>цепная молния</span></span>
                 <strong><span class="cash-price">$140</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="titan" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <svg class="tower-icon titan" viewBox="0 0 40 40" aria-hidden="true" hidden>
-                  <path class="icon-bg" d="M8 12h24v16H8z" />
-                  <path class="icon-stroke" d="M12 9v22M28 9v22M8 20h24M15 12h10v16H15z" />
-                  <circle class="icon-fill" cx="20" cy="20" r="3" />
-                </svg>
+                <svg class="tower-icon titan" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M7 12h10M23 12h10M7 28h10M23 28h10M10 8v7M30 8v7M10 25v7M30 25v7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="мощный удар с уроном по области">Открывается с 20-й волны</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="nova" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <svg class="tower-icon nova" viewBox="0 0 40 40" aria-hidden="true" hidden>
-                  <circle class="icon-bg" cx="20" cy="20" r="16" />
-                  <path class="icon-stroke" d="M20 6 24 16 34 20 24 24 20 34 16 24 6 20 16 16z" />
-                  <circle class="icon-fill" cx="20" cy="20" r="4" />
-                </svg>
+                <svg class="tower-icon nova" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v8M20 28v8M4 20h8M28 20h8M9 9l6 6M25 25l6 6M31 9l-6 6M15 25l-6 6" /><circle class="icon-fill" cx="20" cy="20" r="5" /></svg>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="сильный взрыв с большим радиусом">Открывается с 40-й волны</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="devastator" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <svg class="tower-icon devastator" viewBox="0 0 40 40" aria-hidden="true" hidden>
-                  <path class="icon-bg" d="M20 4 25 14 36 17 27 23 28 35 20 29 12 35 13 23 4 17 15 14z" />
-                  <path class="icon-stroke" d="M20 8v24M8 20h24M11 11l18 18M29 11 11 29" />
-                  <circle class="icon-fill" cx="20" cy="20" r="3" />
-                </svg>
+                <svg class="tower-icon devastator" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="9" /><path class="icon-stroke" d="M20 4v9M20 27v9M4 20h9M27 20h9M8 8l7 7M25 25l7 7M32 8l-7 7M15 25l-7 7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="тяжёлый урон по большой области">Открывается с 70-й волны</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="singularity" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true" hidden>
-                  <circle class="icon-bg" cx="20" cy="20" r="16" />
-                  <circle class="icon-stroke" cx="20" cy="20" r="11" />
-                  <circle class="icon-stroke" cx="20" cy="20" r="5" />
-                  <circle class="icon-fill" cx="20" cy="20" r="2.8" />
-                </svg>
+                <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="10" /><circle class="icon-stroke" cx="20" cy="20" r="6" /><circle class="icon-fill" cx="20" cy="20" r="2.8" /></svg>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="ультимативная башня с колоссальным уроном">Открывается с 100-й волны</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
             </div>
             <div class="boost-list hidden" id="boostList">
               <button class="tower-card support-card locked mystery" data-tower="booster" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v7M20 29v7M4 20h7M29 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v7M20 29v7M4 20h7M29 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+15% урон · +10 радиус · +8% скорость">Открывается с 30-й волны</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="overcharger" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><path class="icon-stroke" d="M20 6v28M6 20h28M11 11l18 18M29 11 11 29" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 5v30M5 20h30" /><path class="icon-stroke" d="m13 13 5 5-5 5M27 13l-5 5 5 5" /><circle class="icon-fill" cx="20" cy="20" r="3.5" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+18% скорость · +5% урон">Открывается с 90-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="range_amp" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><circle class="icon-stroke" cx="20" cy="20" r="6" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+35 радиус · +8% урон">Открывается с 120-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="reactor" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="15" /><path class="icon-stroke" d="M20 5v30M5 20h30" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v10M20 26v10M4 20h10M26 20h10" /><path class="icon-stroke" d="m12 12 5 5M23 23l5 5M28 12l-5 5M17 23l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+15% урон · +12% скорость">Открывается с 200-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="nexus" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true" hidden><circle class="icon-bg" cx="20" cy="20" r="16" /><path class="icon-stroke" d="M20 4v32M4 20h32M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="10" /><path class="icon-stroke" d="M20 4v32M4 20h32M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+20% урон · +25 радиус · +10% скорость">Открывается с 400-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <div class="boost-info">
