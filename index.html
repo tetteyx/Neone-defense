@@ -15,12 +15,25 @@
         </div>
         <p class="menu-subtitle">Бесконечная защита жизни в неоновом мире</p>
 
+        <button id="menuSettingsBtn" class="menu-settings-btn" type="button" aria-expanded="false" aria-controls="menuSettingsPanel" title="Настройки">⚙</button>
+        <div id="menuSettingsPanel" class="menu-settings-panel hidden">
+          <h3>Настройки</h3>
+          <div class="menu-settings-row">
+            <label for="menuVolumeSlider">🔊 Громкость</label>
+            <span id="menuVolumeValue">55%</span>
+          </div>
+          <div class="menu-settings-row">
+            <input id="menuVolumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" />
+          </div>
+          <button id="menuFullscreenBtn" type="button">⛶ Весь экран</button>
+        </div>
+
         <div class="menu-section">
           <h2>Выберите сложность</h2>
           <div class="difficulty-list" id="difficultyList">
             <button class="difficulty-card active" data-difficulty="easy">
               <span class="difficulty-icon">I</span>
-              <span><b>Легкий</b><small>Мобы слабее, больше наград</small></span>
+              <span><b>Легкий</b><small>Мобы слабее, больше награды</small></span>
             </button>
             <button class="difficulty-card" data-difficulty="normal">
               <span class="difficulty-icon">II</span>
@@ -28,7 +41,7 @@
             </button>
             <button class="difficulty-card" data-difficulty="hard">
               <span class="difficulty-icon">III</span>
-              <span><b>Сложный</b><small>Мобы сильнее, меньше наград</small></span>
+              <span><b>Сложный</b><small>Мобы сильнее, меньше награды</small></span>
             </button>
           </div>
           <p class="selected-difficulty">Сложность: <strong id="selectedDifficultyName">Легкий</strong></p>
@@ -265,8 +278,6 @@
       </div>
     </div>
 
-
-
     <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
       <div class="modal-card">
         <h2 id="endTitle">Игра окончена</h2>
@@ -278,6 +289,60 @@
       </div>
     </div>
 
+    <script>
+      (() => {
+        const btn = document.getElementById('menuSettingsBtn');
+        const panel = document.getElementById('menuSettingsPanel');
+        const slider = document.getElementById('menuVolumeSlider');
+        const value = document.getElementById('menuVolumeValue');
+        const fullscreen = document.getElementById('menuFullscreenBtn');
+        const key = 'neonBridgeDefenseVolume_v1';
+
+        let volume = 55;
+        try {
+          const saved = Number(localStorage.getItem(key));
+          if (Number.isFinite(saved)) volume = Math.max(0, Math.min(100, Math.round(saved * 100)));
+        } catch (e) {}
+
+        const syncVolume = () => {
+          slider.value = String(volume);
+          value.textContent = `${volume}%`;
+          try { localStorage.setItem(key, String(volume / 100)); } catch (e) {}
+        };
+
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const open = !panel.classList.contains('hidden');
+          panel.classList.toggle('hidden', open);
+          btn.setAttribute('aria-expanded', String(!open));
+          syncVolume();
+        });
+
+        panel.addEventListener('click', event => event.stopPropagation());
+        document.addEventListener('click', () => {
+          panel.classList.add('hidden');
+          btn.setAttribute('aria-expanded', 'false');
+        });
+
+        slider.addEventListener('input', () => {
+          volume = Number(slider.value);
+          syncVolume();
+        });
+
+        fullscreen.addEventListener('click', async () => {
+          try {
+            if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+            else await document.exitFullscreen();
+          } catch (e) {}
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+          fullscreen.textContent = document.fullscreenElement ? '⛶ Выйти из полного экрана' : '⛶ Весь экран';
+        });
+
+        syncVolume();
+      })();
+    </script>
     <script src="game.js"></script>
   </body>
 </html>
