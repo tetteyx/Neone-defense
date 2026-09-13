@@ -7,23 +7,18 @@
 .tower-card[data-tower].active:not(.locked) .tower-icon .icon-bg{fill:#63e6ff !important;opacity:.14 !important}
 .tower-card[data-tower].active:not(.locked) .tower-icon .icon-stroke{stroke-width:2.2 !important}
 
-/* VERSION 83 — CORE совмещён с концом дороги, а дорога заканчивается у его левой грани. */
-.arena-wrap{position:relative;overflow:hidden;--base-y:34.375%;--core-size:10.8%;--core-right:4.6%}
+/* VERSION 84 — вместо синего CORE оставлен простой красный круг в конце дороги. */
+.arena-wrap{position:relative;overflow:hidden;--base-y:34.375%;--core-size:5.6%;--core-right:9.8%}
 body:has(#mapList .map-card[data-map="circuit"].active) .arena-wrap{--base-y:78.125%}
 body:has(#mapList .map-card[data-map="coreline"].active) .arena-wrap{--base-y:46.875%}
 
-/* Затемнение справа оставляет чистую площадку вокруг ядра и не маскирует сам CORE. */
+/* Затемнение справа оставляет свободную площадку в конце дороги. */
 .arena-wrap::after{content:"";position:absolute;right:0;top:0;width:14%;height:100%;background:linear-gradient(90deg,rgba(7,17,27,0),rgba(5,13,22,.58) 38%,rgba(4,11,19,.92) 100%);z-index:3;pointer-events:none}
 
-/* CORE — крупный защищённый реактор с корпусом, сегментированным контуром и центральным кристаллом. */
-.arena-wrap::before{content:"";position:absolute;right:var(--core-right);top:var(--base-y);width:var(--core-size);height:var(--core-size);transform:translateY(-50%);box-sizing:border-box;border-radius:18%;border:2px solid rgba(126,244,255,.95);background:
-  radial-gradient(ellipse at 50% 50%,#ffffff 0 4%,#8df7ff 5% 9%,rgba(34,230,255,.9) 10% 14%,rgba(7,33,49,.98) 15% 30%,transparent 31%),
-  conic-gradient(from 45deg,transparent 0 8%,rgba(99,230,255,.95) 8% 13%,transparent 13% 25%,rgba(99,230,255,.9) 25% 30%,transparent 30% 42%,rgba(99,230,255,.95) 42% 47%,transparent 47% 60%,rgba(99,230,255,.9) 60% 65%,transparent 65% 77%,rgba(99,230,255,.95) 77% 82%,transparent 82%),
-  linear-gradient(135deg,rgba(72,223,255,.18),transparent 24% 76%,rgba(72,223,255,.12)),
-  radial-gradient(circle,#071a29 0 57%,#0b3348 58% 62%,#020c15 63% 100%);
-box-shadow:0 0 0 5px rgba(4,16,26,.92),0 0 0 7px rgba(56,222,248,.28),0 0 18px rgba(34,230,255,.88),0 0 42px rgba(34,230,255,.34),inset 0 0 28px rgba(99,230,255,.38);z-index:5;pointer-events:none}
+/* Красный защитный круг стоит ровно у точки, где заканчивается дорога. */
+.arena-wrap::before{content:"";position:absolute;right:var(--core-right);top:var(--base-y);width:var(--core-size);height:var(--core-size);transform:translateY(-50%);box-sizing:border-box;border-radius:50%;border:3px solid #ff405d;background:radial-gradient(circle,#ff405d 0 30%,#b5102d 31% 64%,#4a0715 65% 100%);box-shadow:0 0 0 3px rgba(36,7,14,.9),0 0 14px rgba(255,48,82,.95),0 0 28px rgba(255,48,82,.45),inset 0 0 10px rgba(255,190,200,.55);z-index:5;pointer-events:none}
 
 @media(max-width:700px){
-  .arena-wrap{--core-size:10.8%;--core-right:4.6%}
+  .arena-wrap{--core-size:5.6%;--core-right:9.8%}
   .arena-wrap::after{width:14%;background:linear-gradient(90deg,rgba(7,17,27,0),rgba(5,13,22,.58) 38%,rgba(4,11,19,.92) 100%)}
 }
