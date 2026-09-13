@@ -2723,205 +2723,91 @@ function drawComboLinks(groups) {
 }
 
 function drawTower(tower) {
-  const type =
-      towerTypes[tower.type];
-
-  const selected =
-      tower === state.selectedTower;
-
-  const stats =
-      getTowerStats(tower);
-
-  if (selected && state.rangeUpgradeHover) {
-    drawRangeUpgradePreview(tower, type);
-  }
-
+  const type = towerTypes[tower.type];
+  const selected = tower === state.selectedTower;
+  if (selected && state.rangeUpgradeHover) drawRangeUpgradePreview(tower, type);
   drawTowerUpgradeVisual(tower, type);
 
   const comboReady = (state.comboReadyTowers && state.comboReadyTowers.has(tower)) || false;
   if (comboReady) {
     ctx.save();
     ctx.globalAlpha = 0.35 + 0.15 * Math.sin(performance.now() / 180);
-    ctx.strokeStyle = type.color;
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = type.color;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 6]);
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 29, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.strokeStyle = type.color; ctx.shadowBlur = 14; ctx.shadowColor = type.color;
+    ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+    ctx.beginPath(); ctx.arc(tower.x, tower.y, 29, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
-  /*
-   * Свечение.
-   */
   ctx.save();
-
   if (tower.speedOverdriveShake > 0) {
     const intensity = 6.5 * (tower.speedOverdriveShake / SPEED_OVERDRIVE_SHAKE_DURATION);
     ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
   }
 
-  ctx.shadowBlur =
-      selected ? 34 : 14;
+  // Единый стиль поставленных башен: круглый корпус, внутреннее кольцо,
+  // цветное ядро и символ, совпадающий по смыслу с иконкой карточки.
+  ctx.shadowBlur = selected ? 28 : 7;
+  ctx.shadowColor = type.color;
+  ctx.fillStyle = '#0d1826';
+  ctx.strokeStyle = type.color;
+  ctx.lineWidth = selected ? 3 : 2;
+  ctx.globalAlpha = selected ? 1 : 0.92;
+  ctx.beginPath(); ctx.arc(tower.x, tower.y, 21, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
-  ctx.shadowColor =
-      type.color;
+  ctx.shadowBlur = selected ? 15 : 4;
+  ctx.lineWidth = selected ? 2 : 1.5;
+  ctx.globalAlpha = selected ? 0.95 : 0.75;
+  ctx.beginPath(); ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2); ctx.stroke();
 
-  if (selected) {
-    ctx.globalAlpha = 1;
+  ctx.shadowBlur = selected ? 16 : 7;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = type.color;
+  ctx.beginPath(); ctx.arc(tower.x, tower.y, 5.5, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save();
+  ctx.strokeStyle = type.color; ctx.fillStyle = type.color;
+  ctx.lineWidth = selected ? 2.2 : 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.shadowBlur = selected ? 11 : 4;
+  const x = tower.x, y = tower.y;
+  const line = (x1,y1,x2,y2) => { ctx.beginPath(); ctx.moveTo(x+x1,y+y1); ctx.lineTo(x+x2,y+y2); ctx.stroke(); };
+
+  if (tower.type === 'pulse') {
+    line(0,-8,0,-15); line(0,8,0,15); line(-8,0,-15,0); line(8,0,15,0);
+  } else if (tower.type === 'rail') {
+    line(-10,10,10,-10); line(-5,14,14,-5);
+  } else if (tower.type === 'frost') {
+    line(0,-10,0,10); line(-10,0,10,0); line(-7,-7,7,7); line(7,-7,-7,7);
+  } else if (tower.type === 'blast') {
+    for (let i=0;i<8;i++) { const a=i*Math.PI/4; line(Math.cos(a)*7,Math.sin(a)*7,Math.cos(a)*14,Math.sin(a)*14); }
+  } else if (tower.type === 'arc') {
+    ctx.beginPath(); ctx.moveTo(x-10,y+6); ctx.quadraticCurveTo(x,y-9,x+10,y+6); ctx.stroke();
+  } else if (tower.type === 'titan') {
+    line(-10,-8,10,-8); line(-10,8,10,8); line(-10,-8,-10,8); line(10,-8,10,8);
+  } else if (tower.type === 'nova') {
+    for (let i=0;i<8;i++) { const a=i*Math.PI/4; line(Math.cos(a)*8,Math.sin(a)*8,Math.cos(a)*15,Math.sin(a)*15); }
+  } else if (tower.type === 'devastator') {
+    ctx.beginPath(); ctx.arc(x,y,15,0,Math.PI*2); ctx.stroke(); line(-9,-9,9,9); line(9,-9,-9,9);
+  } else if (tower.type === 'singularity') {
+    ctx.beginPath(); ctx.arc(x,y,15,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.stroke();
+  } else if (tower.type === 'booster') {
+    line(0,-14,0,14); line(-14,0,14,0);
+  } else if (tower.type === 'overcharger') {
+    ctx.beginPath(); ctx.moveTo(x,y-12); ctx.lineTo(x+8,y); ctx.lineTo(x,y+12); ctx.lineTo(x-8,y); ctx.closePath(); ctx.stroke();
+  } else if (tower.type === 'range_amp') {
+    ctx.beginPath(); ctx.arc(x,y,15,0,Math.PI*2); ctx.stroke(); line(-10,0,10,0);
+  } else if (tower.type === 'reactor') {
+    ctx.beginPath(); ctx.moveTo(x,y-12); ctx.lineTo(x+10,y+8); ctx.lineTo(x-10,y+8); ctx.closePath(); ctx.stroke();
+  } else if (tower.type === 'nexus') {
+    ctx.beginPath(); ctx.moveTo(x,y-14); ctx.lineTo(x+12,y); ctx.lineTo(x,y+14); ctx.lineTo(x-12,y); ctx.closePath(); ctx.stroke();
   }
-
-  ctx.fillStyle =
-      "#0d1826";
-
-  ctx.strokeStyle =
-      type.color;
-
-  ctx.lineWidth =
-      selected ? 3 : 2;
-
-  /*
-   * Разные формы башен.
-   */
-  if (tower.type === "rail") {
-    ctx.beginPath();
-
-    ctx.moveTo(
-        tower.x - 18,
-        tower.y + 12
-    );
-
-    ctx.lineTo(
-        tower.x + 12,
-        tower.y - 18
-    );
-
-    ctx.lineTo(
-        tower.x + 20,
-        tower.y - 10
-    );
-
-    ctx.lineTo(
-        tower.x - 10,
-        tower.y + 20
-    );
-
-    ctx.closePath();
-
-    ctx.fill();
-    ctx.stroke();
-  } else if (tower.type === "blast") {
-    ctx.beginPath();
-
-    for (let i = 0; i < 8; i++) {
-      const angle =
-          i *
-          Math.PI /
-          4;
-
-      const radius =
-          i % 2 === 0
-              ? 22
-              : 12;
-
-      const x =
-          tower.x +
-          Math.cos(angle) *
-          radius;
-
-      const y =
-          tower.y +
-          Math.sin(angle) *
-          radius;
-
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-
-    ctx.closePath();
-
-    ctx.fill();
-    ctx.stroke();
-  } else if (tower.type === "singularity") {
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 13, 0, Math.PI * 2);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = type.color;
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 5, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (tower.type === "arc") {
-    ctx.beginPath();
-
-    ctx.moveTo(
-        tower.x,
-        tower.y - 22
-    );
-
-    ctx.lineTo(
-        tower.x + 15,
-        tower.y + 16
-    );
-
-    ctx.lineTo(
-        tower.x - 15,
-        tower.y + 16
-    );
-
-    ctx.closePath();
-
-    ctx.fill();
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-
-    ctx.arc(
-        tower.x,
-        tower.y,
-        20,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  ctx.shadowBlur = 0;
-
-  /*
-   * Центральная точка жизней.
-   */
-  ctx.fillStyle =
-      type.color;
-
-  ctx.beginPath();
-
-  ctx.arc(
-      tower.x,
-      tower.y,
-      6,
-      0,
-      Math.PI * 2
-  );
-
-  ctx.fill();
-
   ctx.restore();
 
-
-
+  if (selected) {
+    ctx.shadowBlur = 18; ctx.shadowColor = type.color; ctx.globalAlpha = 0.78;
+    ctx.strokeStyle = type.color; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(tower.x, tower.y, 27, 0, Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 
