@@ -1,0 +1,141 @@
+name: Version 79 fix
+on:
+  push:
+    paths:
+      - '.github/workflows/version-79-fix.yml'
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('styles.css')
+          s = p.read_text(encoding='utf-8')
+          start = s.index('.tower-card[data-tower="pulse"]{')
+          end = s.index('@keyframes pulseTowerRing', start)
+          end = s.index('\n', s.index('}', end)) + 1
+          block = '''/* Версия 79 — свечение Импульса только при выборе. */
+          .tower-card[data-tower="pulse"]{position:relative;overflow:hidden}
+          .tower-card[data-tower="pulse"] .tower-icon.pulse{position:relative;z-index:1}
+          .tower-card[data-tower="pulse"].active{border-color:#63e6ff;background:linear-gradient(135deg,rgba(10,48,67,.98),rgba(5,22,36,.98));box-shadow:0 0 18px rgba(34,230,255,.16),inset 0 0 24px rgba(34,230,255,.08)}
+          .tower-card[data-tower="pulse"].active .tower-icon.pulse{color:#63e6ff;width:40px;height:40px;filter:drop-shadow(0 0 5px #63e6ff) drop-shadow(0 0 12px rgba(34,230,255,.75));transform:scale(1.08)}
+          .tower-card[data-tower="pulse"].active .tower-icon.pulse .icon-bg{fill:#63e6ff;opacity:.14}
+          .tower-card[data-tower="pulse"].active .tower-icon.pulse .icon-stroke{stroke-width:2.2}
+          .tower-card[data-tower="pulse"].active .tower-icon.pulse .icon-fill{fill:#d9fbff;filter:drop-shadow(0 0 4px #63e6ff)}
+          .tower-card[data-tower="pulse"].active .tower-copy b{color:#dffbff;text-shadow:0 0 9px rgba(99,230,255,.28)}
+          '''
+          s = s[:start] + block + s[end:]
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('game-core.js')
+          s = p.read_text(encoding='utf-8')
+          start = s.index('function drawTower(tower) {')
+          end = s.index('\n\n/* =========================================================\n   ВРАГИ', start)
+          new = r'''function drawTower(tower) {
+            const type = towerTypes[tower.type];
+            const selected = tower === state.selectedTower;
+            if (selected && state.rangeUpgradeHover) drawRangeUpgradePreview(tower, type);
+            drawTowerUpgradeVisual(tower, type);
+
+            const comboReady = (state.comboReadyTowers && state.comboReadyTowers.has(tower)) || false;
+            if (comboReady) {
+              ctx.save();
+              ctx.globalAlpha = 0.35 + 0.15 * Math.sin(performance.now() / 180);
+              ctx.strokeStyle = type.color; ctx.shadowBlur = 14; ctx.shadowColor = type.color;
+              ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+              ctx.beginPath(); ctx.arc(tower.x, tower.y, 29, 0, Math.PI * 2); ctx.stroke();
+              ctx.restore();
+            }
+
+            ctx.save();
+            if (tower.speedOverdriveShake > 0) {
+              const intensity = 6.5 * (tower.speedOverdriveShake / SPEED_OVERDRIVE_SHAKE_DURATION);
+              ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
+            }
+
+            // Единый стиль поставленных башен: круглый корпус, внутреннее кольцо,
+            // цветное ядро и символ, совпадающий по смыслу с иконкой карточки.
+            ctx.shadowBlur = selected ? 28 : 7;
+            ctx.shadowColor = type.color;
+            ctx.fillStyle = '#0d1826';
+            ctx.strokeStyle = type.color;
+            ctx.lineWidth = selected ? 3 : 2;
+            ctx.globalAlpha = selected ? 1 : 0.92;
+            ctx.beginPath(); ctx.arc(tower.x, tower.y, 21, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            ctx.shadowBlur = selected ? 15 : 4;
+            ctx.lineWidth = selected ? 2 : 1.5;
+            ctx.globalAlpha = selected ? 0.95 : 0.75;
+            ctx.beginPath(); ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2); ctx.stroke();
+
+            ctx.shadowBlur = selected ? 16 : 7;
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = type.color;
+            ctx.beginPath(); ctx.arc(tower.x, tower.y, 5.5, 0, Math.PI * 2); ctx.fill();
+
+            ctx.save();
+            ctx.strokeStyle = type.color; ctx.fillStyle = type.color;
+            ctx.lineWidth = selected ? 2.2 : 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.shadowBlur = selected ? 11 : 4;
+            const x = tower.x, y = tower.y;
+            const line = (x1,y1,x2,y2) => { ctx.beginPath(); ctx.moveTo(x+x1,y+y1); ctx.lineTo(x+x2,y+y2); ctx.stroke(); };
+
+            if (tower.type === 'pulse') {
+              line(0,-8,0,-15); line(0,8,0,15); line(-8,0,-15,0); line(8,0,15,0);
+            } else if (tower.type === 'rail') {
+              line(-10,10,10,-10); line(-5,14,14,-5);
+            } else if (tower.type === 'frost') {
+              line(0,-10,0,10); line(-10,0,10,0); line(-7,-7,7,7); line(7,-7,-7,7);
+            } else if (tower.type === 'blast') {
+              for (let i=0;i<8;i++) { const a=i*Math.PI/4; line(Math.cos(a)*7,Math.sin(a)*7,Math.cos(a)*14,Math.sin(a)*14); }
+            } else if (tower.type === 'arc') {
+              ctx.beginPath(); ctx.moveTo(x-10,y+6); ctx.quadraticCurveTo(x,y-9,x+10,y+6); ctx.stroke();
+            } else if (tower.type === 'titan') {
+              line(-10,-8,10,-8); line(-10,8,10,8); line(-10,-8,-10,8); line(10,-8,10,8);
+            } else if (tower.type === 'nova') {
+              for (let i=0;i<8;i++) { const a=i*Math.PI/4; line(Math.cos(a)*8,Math.sin(a)*8,Math.cos(a)*15,Math.sin(a)*15); }
+            } else if (tower.type === 'devastator') {
+              ctx.beginPath(); ctx.arc(x,y,15,0,Math.PI*2); ctx.stroke(); line(-9,-9,9,9); line(9,-9,-9,9);
+            } else if (tower.type === 'singularity') {
+              ctx.beginPath(); ctx.arc(x,y,15,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(x,y,8,0,Math.PI*2); ctx.stroke();
+            } else if (tower.type === 'booster') {
+              line(0,-14,0,14); line(-14,0,14,0);
+            } else if (tower.type === 'overcharger') {
+              ctx.beginPath(); ctx.moveTo(x,y-12); ctx.lineTo(x+8,y); ctx.lineTo(x,y+12); ctx.lineTo(x-8,y); ctx.closePath(); ctx.stroke();
+            } else if (tower.type === 'range_amp') {
+              ctx.beginPath(); ctx.arc(x,y,15,0,Math.PI*2); ctx.stroke(); line(-10,0,10,0);
+            } else if (tower.type === 'reactor') {
+              ctx.beginPath(); ctx.moveTo(x,y-12); ctx.lineTo(x+10,y+8); ctx.lineTo(x-10,y+8); ctx.closePath(); ctx.stroke();
+            } else if (tower.type === 'nexus') {
+              ctx.beginPath(); ctx.moveTo(x,y-14); ctx.lineTo(x+12,y); ctx.lineTo(x,y+14); ctx.lineTo(x-12,y); ctx.closePath(); ctx.stroke();
+            }
+            ctx.restore();
+
+            if (selected) {
+              ctx.shadowBlur = 18; ctx.shadowColor = type.color; ctx.globalAlpha = 0.78;
+              ctx.strokeStyle = type.color; ctx.lineWidth = 1.5;
+              ctx.beginPath(); ctx.arc(tower.x, tower.y, 27, 0, Math.PI*2); ctx.stroke();
+            }
+            ctx.restore();
+          }
+          '''
+          s = s[:start] + new + s[end:]
+          p.write_text(s, encoding='utf-8')
+
+          for name in ['.github/workflows/version-79.yml', '.github/workflows/version-79-fix.yml', 'version-78-trigger-2.txt']:
+              q = Path(name)
+              if q.exists(): q.unlink()
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Версия 79"
+          git push
