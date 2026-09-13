@@ -16,10 +16,17 @@ jobs:
           import re
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-          old = '<div class="wave-status"><small>WAVE</small><span id="wave">0 ∞</span><small>KILLS</small><span id="kills">0</span></div>'
-          new = '<div class="wave-status"><div class="wave-stat"><small>WAVE</small><span id="wave">0 ∞</span></div><div class="wave-stat"><small>KILLS</small><span id="kills">0</span></div></div>'
-          if old not in s: raise SystemExit('wave markup not found')
-          s = s.replace(old, new, 1)
+          replacements = [
+            ('<div class="wave-status"><small>WAVE</small><span id="wave">0 ∞</span><small>KILLS</small><span id="kills">0</span></div>', '<div class="wave-status"><div class="wave-stat"><small>WAVE</small><span id="wave">0 ∞</span></div><div class="wave-stat"><small>KILLS</small><span id="kills">0</span></div></div>'),
+            ('<div class="wave-status"><span id="wave">0 ∞</span><small>волна</small><span id="kills">0</span><small>сбито</small></div>', '<div class="wave-status"><div class="wave-stat"><small>WAVE</small><span id="wave">0 ∞</span></div><div class="wave-stat"><small>KILLS</small><span id="kills">0</span></div></div>')
+          ]
+          for old, new in replacements:
+              if old in s:
+                  s = s.replace(old, new, 1)
+                  break
+          else:
+              raise SystemExit('wave markup not found')
+
           icons = {
             'pulse': '<svg class="tower-icon pulse" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 7v8M20 25v8M7 20h8M25 20h8" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>',
             'rail': '<svg class="tower-icon rail" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M8 29 29 8M13 32 32 13M10 20h10M20 10v10" /><circle class="icon-fill" cx="29" cy="8" r="3" /></svg>',
@@ -59,7 +66,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          rm -f .github/workflows/version-78.yml
-          git add index.html styles.css .github/workflows/version-78.yml
+          rm -f .github/workflows/version-78.yml version-78-trigger.txt
+          git add index.html styles.css .github/workflows/version-78.yml version-78-trigger.txt
           git commit -m 'Версия 78'
           git push origin HEAD:main
