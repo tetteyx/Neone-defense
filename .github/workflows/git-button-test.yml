@@ -1,4 +1,4 @@
-name: Add GIT test button
+name: Remove GIT test button
 
 on:
   push:
@@ -8,30 +8,21 @@ permissions:
   contents: write
 
 jobs:
-  add-git-button:
+  remove-git-button:
     if: "!contains(github.event.head_commit.message, '[skip git button]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Add GIT button
+      - name: Remove GIT button
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('index.html')
           text = p.read_text(encoding='utf-8')
-          marker = '<button id="devInfiniteMoneyBtn"'
-          if 'id="gitTestBtn"' in text:
+          line = '        <button id="gitTestBtn" class="dev-money-btn" type="button">GIT</button>\n'
+          if line not in text:
               raise SystemExit(0)
-          start = text.find(marker)
-          if start == -1:
-              raise SystemExit('Could not find main menu button area')
-          end = text.find('</button>', start)
-          if end == -1:
-              raise SystemExit('Could not find closing button tag')
-          end += len('</button>')
-          insert = '\n        <button id="gitTestBtn" class="dev-money-btn" type="button">GIT</button>'
-          text = text[:end] + insert + text[end:]
-          p.write_text(text, encoding='utf-8')
+          p.write_text(text.replace(line, ''), encoding='utf-8')
           PY
       - name: Commit and push
         run: |
@@ -39,5 +30,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git diff --cached --quiet && exit 0
-          git commit -m "Add GIT test button [skip git button]"
+          git commit -m "Remove temporary GIT test button [skip git button]"
           git push
