@@ -1,0 +1,23 @@
+name: Version 80
+
+on:
+  push:
+    paths:
+      - '.github/workflows/version-80.yml'
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore game core and commit
+        run: |
+          git checkout e8627707b5ef56b245050a6a52c6a845a1486f19 -- game-core.js
+          rm -f .github/workflows/version-80.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Версия 80"
+          git push
