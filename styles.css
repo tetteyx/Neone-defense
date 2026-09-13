@@ -1,6 +1,6 @@
 @import url("styles-base.css");
 
-/* VERSION 71 — меню и тестовый редизайн Импульса */
+/* VERSION 73 — блок комбинаций в колонке башен */
 :root{--menu-cyan:#22e6ff;--menu-blue:#1188e8;--menu-bg:#020b16;--menu-text:#f3f8ff;--menu-muted:#6fc9f5;--menu-green:#27e6b4}
 .main-menu{min-height:100vh;padding:22px 3vw 24px;display:block;overflow:auto;background:radial-gradient(circle at 50% 0%,rgba(0,151,255,.13),transparent 34%),linear-gradient(180deg,#020914,#031322 55%,#020a13);position:relative;color:var(--menu-text)}
 .main-menu:before,.main-menu:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0}.main-menu:before{background-image:linear-gradient(rgba(31,130,181,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(31,130,181,.035) 1px,transparent 1px);background-size:48px 48px}.main-menu:after{background:linear-gradient(135deg,transparent 0 15%,rgba(20,143,220,.07) 15.1% 15.25%,transparent 15.35% 84%,rgba(89,66,255,.06) 84.1% 84.25%,transparent 84.35%)}
@@ -20,7 +20,7 @@
 .circuit-preview{background-color:#07182a;background-image:linear-gradient(rgba(45,110,160,.2) 1px,transparent 1px),linear-gradient(90deg,rgba(45,110,160,.2) 1px,transparent 1px);background-size:22px 22px}
 .circuit-preview:before{left:16%;right:16%;top:16%;height:68%;border:12px solid #b76cff;border-radius:18px;box-shadow:0 0 20px rgba(183,108,255,.9),inset 0 0 12px rgba(183,108,255,.55);clip-path:polygon(0 0,100% 0,100% 28%,55% 28%,55% 52%,100% 52%,100% 100%,0 100%,0 72%,45% 72%,45% 48%,0 48%)}
 .circuit-preview:after{left:10%;right:10%;top:10%;height:80%;background:radial-gradient(circle at 20% 20%,#ff668c 0 3px,transparent 4px),radial-gradient(circle at 80% 75%,#36e8ff 0 3px,transparent 4px),radial-gradient(circle at 75% 30%,#ffdc62 0 3px,transparent 4px)}
-.coreline-preview{background:linear-gradient(135deg,#103d27,#1f6b35 45%,#123e28);}
+.coreline-preview{background:linear-gradient(135deg,#103d27,#1f6b35 45%,#123e28)}
 .coreline-preview:before{left:8%;top:8%;width:84%;height:84%;background:linear-gradient(90deg,transparent 0 18%,#36dcff 18% 24%,transparent 24% 45%,#36dcff 45% 51%,transparent 51% 72%,#36dcff 72% 78%,transparent 78%);filter:drop-shadow(0 0 7px #36dcff);clip-path:polygon(0 38%,20% 38%,20% 12%,48% 12%,48% 72%,75% 72%,75% 42%,100% 42%,100% 58%,82% 58%,82% 88%,42% 88%,42% 28%,26% 28%,26% 54%,0 54%)}
 .coreline-preview:after{inset:0;background-image:radial-gradient(circle at 15% 20%,#4bbf65 0 8px,transparent 9px),radial-gradient(circle at 85% 22%,#58ca6e 0 10px,transparent 11px),radial-gradient(circle at 22% 80%,#3fae5a 0 9px,transparent 10px),radial-gradient(circle at 82% 78%,#55c96c 0 8px,transparent 9px);opacity:.75}
 .menu-settings-btn{position:absolute;right:4px;top:28px;width:70px;height:70px;z-index:5;border:2px solid rgba(42,205,255,.72);border-radius:14px;background:rgba(2,19,34,.96);color:#c9f8ff;font-size:38px;display:grid;place-items:center;cursor:pointer;box-shadow:0 0 24px rgba(20,198,255,.18),inset 0 0 20px rgba(20,155,255,.07)}.menu-settings-btn:hover{border-color:#58edff;box-shadow:0 0 30px rgba(20,220,255,.35)}
@@ -33,7 +33,7 @@
 /* Версия 71: кнопку полного экрана в игровом меню больше не показываем. */
 #menuFullscreenBtn{display:none!important}
 
-/* Тестовый редизайн первой башни — только визуал карточки/иконки, механика не меняется. */
+/* Редизайн карточки первой башни — механика не меняется. */
 .tower-card[data-tower="pulse"]{position:relative;overflow:hidden;border-color:rgba(99,230,255,.42);background:linear-gradient(135deg,rgba(8,31,48,.98),rgba(6,18,31,.98));box-shadow:inset 0 0 22px rgba(34,230,255,.055)}
 .tower-card[data-tower="pulse"]:before{content:"";position:absolute;width:54px;height:54px;left:3px;top:50%;transform:translateY(-50%);border:1px solid rgba(99,230,255,.28);border-radius:50%;box-shadow:0 0 16px rgba(34,230,255,.18),inset 0 0 12px rgba(34,230,255,.08);pointer-events:none;animation:pulseTowerRing 2.8s linear infinite}
 .tower-card[data-tower="pulse"] .tower-icon.pulse{color:#63e6ff;width:40px;height:40px;filter:drop-shadow(0 0 5px #63e6ff) drop-shadow(0 0 12px rgba(34,230,255,.75));transform:scale(1.08);position:relative;z-index:1}
@@ -43,3 +43,13 @@
 .tower-card[data-tower="pulse"] .tower-copy b{color:#dffbff;text-shadow:0 0 9px rgba(99,230,255,.28)}
 .tower-card[data-tower="pulse"].active{border-color:#63e6ff;background:linear-gradient(135deg,rgba(10,48,67,.98),rgba(5,22,36,.98));box-shadow:0 0 18px rgba(34,230,255,.16),inset 0 0 24px rgba(34,230,255,.08)}
 @keyframes pulseTowerRing{0%{transform:translateY(-50%) scale(.9);opacity:.55}50%{transform:translateY(-50%) scale(1.05);opacity:.9}100%{transform:translateY(-50%) scale(.9);opacity:.55}}
+
+/* =========================================================
+   КОМБИНАЦИИ — справочный блок в нижней части панели башен.
+   Это намеренно CSS-only блок: он не меняет игровую механику.
+========================================================= */
+.panel{position:relative}
+.panel:after{content:"⚡  КОМБИНАЦИИ\A\AИМПУЛЬС  ───►  УСИЛИТЕЛЬ\AБыстрый основной DPS. Усилитель особенно полезен для башни, которая постоянно стреляет.\A\AКРИОУЗЕЛ  ───►  РАЗЛОМ\AКонтроль + урон по области: замедленные враги дольше остаются в опасной зоне Разлома.\A\AРЕЛЬСОТРОН  ───►  ДАЛЬНИЙ МОДУЛЬ\AДальняя башня получает больше пользы от дополнительного радиуса: легче покрывать длинные участки маршрута.\A\AДУГА  ───►  УСИЛИТЕЛЬ\AЦепная молния лучше раскрывается в плотных волнах, а усиление повышает ценность основной боевой позиции.\A\AРАЗЛОМ  ───►  ДАЛЬНИЙ МОДУЛЬ\AБольшая зона поражения + дополнительная дальность помогают накрывать больше маршрута.\A\AСИЛЬНАЯ БАШНЯ  ───►  РАЗГОНЩИК\AДля поздней игры: концентрируй поддержку на одной дорогой боевой башне вместо равномерного усиления всего поля.\A\AСХЕМА:  [КОНТРОЛЬ] ─► [УРОН] ─► [УСИЛЕНИЕ]\AСтавь контроль рядом с зоной основного урона, а усиление — так, чтобы оно обслуживало ключевую башню.";display:block;box-sizing:border-box;margin-top:14px;padding:15px 14px 16px;border:1px solid rgba(34,230,255,.32);border-radius:12px;background:linear-gradient(145deg,rgba(3,25,41,.96),rgba(2,12,22,.98));color:#bfeeff;font-size:clamp(.68rem,.72vw,.84rem);line-height:1.38;white-space:pre-line;box-shadow:inset 0 0 24px rgba(34,230,255,.035),0 0 18px rgba(0,120,200,.06);text-shadow:0 0 7px rgba(34,230,255,.12);overflow:hidden}
+.panel:after{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+@media(max-width:1050px){.panel:after{font-size:.78rem}}
+@media(max-width:700px){.panel:after{font-size:.72rem;line-height:1.32;padding:13px 11px}.panel{padding-bottom:8px}}
