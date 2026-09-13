@@ -6,6 +6,7 @@
 
   const GAME_SAVE_KEY = "neonBridgeDefenseSave_v5";
   const CORE_SCRIPT = "game-core.js";
+  const ADAPTIVE_STYLE = "yandex.css";
 
   window.NeonBridgeYandex = {
     sdk: null,
@@ -13,11 +14,10 @@
     ready: false,
     platformPaused: false,
     platformPausedGame: false,
+    gameplayActive: false,
     language: "ru"
   };
 
-  // Yandex moderation requires that the game area does not expose the browser
-  // context menu or text selection on long/right clicks.
   document.addEventListener("contextmenu", (event) => {
     if (event.target instanceof HTMLCanvasElement) event.preventDefault();
   });
@@ -36,6 +36,22 @@
     });
   }
 
+  function loadStyle(href) {
+    return new Promise((resolve) => {
+      if (document.querySelector(`link[data-neon-yandex-style="${href}"]`)) {
+        resolve();
+        return;
+      }
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      link.dataset.neonYandexStyle = href;
+      link.onload = resolve;
+      link.onerror = resolve;
+      document.head.appendChild(link);
+    });
+  }
+
   function loadCore() {
     return new Promise((resolve, reject) => {
       const script = document.createElement("script");
@@ -48,16 +64,21 @@
 
   function installAudioFocusGuard() {
     const NativeAudioContext = window.AudioContext;
-    if (!NativeAudioContext || window.__neonBridgeAudioContextWrapped) return;
+    const NativeWebkitAudioContext = window.webkitAudioContext;
+    const AudioCtor = NativeAudioContext || NativeWebkitAudioContext;
+    if (!AudioCtor || window.__neonBridgeAudioContextWrapped) return;
 
     try {
-      window.AudioContext = new Proxy(NativeAudioContext, {
+      const WrappedAudioContext = new Proxy(AudioCtor, {
         construct(target, args) {
           const context = Reflect.construct(target, args);
           window.__neonBridgeAudioContext = context;
           return context;
         }
       });
+
+      window.AudioContext = WrappedAudioContext;
+      if (NativeWebkitAudioContext) window.webkitAudioContext = WrappedAudioContext;
       window.__neonBridgeAudioContextWrapped = true;
     } catch (error) {
       // Some browsers expose a non-configurable AudioContext constructor.
@@ -66,23 +87,22 @@
 
   function stopAudio() {
     const context = window.__neonBridgeAudioContext;
-    if (context && typeof context.suspend === "function") {
-      context.suspend().catch(() => {});
-    }
+    if (context && typeof context.suspend === "function") context.suspend().catch(() => {});
   }
 
   function resumeAudio() {
     const context = window.__neonBridgeAudioContext;
-    if (context && typeof context.resume === "function") {
-      context.resume().catch(() => {});
-    }
+    if (context && typeof context.resume === "function") context.resume().catch(() => {});
   }
 
   function gameplayStart() {
+    if (window.NeonBridgeYandex.platformPaused) return;
+    window.NeonBridgeYandex.gameplayActive = true;
     window.NeonBridgeYandex.sdk?.features?.GameplayAPI?.start?.();
   }
 
   function gameplayStop() {
+    window.NeonBridgeYandex.gameplayActive = false;
     window.NeonBridgeYandex.sdk?.features?.GameplayAPI?.stop?.();
   }
 
@@ -107,22 +127,63 @@
 
     const startGameplay = () => {
       if (!window.NeonBridgeYandex.platformPaused) {
-        gameplayStart();
+        setTimeout(() => {
+          resumeAudio();
+          gameplayStart();
+        }, 0);
       }
     };
 
-    start?.addEventListener("click", () => setTimeout(startGameplay, 0));
-    continueButton?.addEventListener("click", () => setTimeout(startGameplay, 0));
-    restart?.addEventListener("click", () => setTimeout(startGameplay, 0));
+    start?.addEventListener("click", startGameplay);
+    continueButton?.addEventListener("click", startGameplay);
+    restart?.addEventListener("click", startGameplay);
 
-    menu?.addEventListener("click", () => gameplayStop());
-    endMenu?.addEventListener("click", () => gameplayStop());
-    pause?.addEventListener("click", () => gameplayStop());
-    resume?.addEventListener("click", () => setTimeout(() => {
-      if (!window.NeonBridgeYandex.platformPaused) {
-        gameplayStart();
+    menu?.addEventListener("click", () => {
+      stopAudio();
+      gameplayStop();
+    });
+
+    endMenu?.addEventListener("click", () => {
+      stopAudio();
+      gameplayStop();
+    });
+
+    pause?.addEventListener("click", () => {
+      setTimeout(() => {
+        if (isGamePaused()) {
+          stopAudio();
+          gameplayStop();
+        } else if (isGameVisible() && !window.NeonBridgeYandex.platformPaused) {
+          resumeAudio();
+          gameplayStart();
+        }
+      }, 0);
+    });
+
+    resume?.addEventListener("click", () => {
+      setTimeout(() => {
+        if (!window.NeonBridgeYandex.platformPaused && isGameVisible() && !isGamePaused()) {
+          resumeAudio();
+          gameplayStart();
+        }
+      }, 0);
+    });
+  }
+
+  function bindEndStateObserver() {
+    const endModal = document.getElementById("endModal");
+    if (!endModal) return;
+
+    const sync = () => {
+      if (!endModal.classList.contains("hidden")) {
+        stopAudio();
+        gameplayStop();
       }
-    }, 0));
+    };
+
+    const observer = new MutationObserver(sync);
+    observer.observe(endModal, { attributes: true, attributeFilter: ["class"] });
+    sync();
   }
 
   function bindPlatformEvents() {
@@ -133,28 +194,54 @@
       window.NeonBridgeYandex.platformPaused = true;
       stopAudio();
 
-      if (isGameVisible() && !isGamePaused()) {
+      if (isGameVisible() && !isGamePaused() && window.NeonBridgeYandex.gameplayActive) {
         const pauseButton = document.getElementById("pauseBtn");
         if (pauseButton) {
           window.NeonBridgeYandex.platformPausedGame = true;
           pauseButton.click();
         }
+      } else {
+        window.NeonBridgeYandex.platformPausedGame = false;
+        gameplayStop();
       }
-
-      gameplayStop();
     });
 
     sdk.on("game_api_resume", () => {
       window.NeonBridgeYandex.platformPaused = false;
-      resumeAudio();
 
       if (window.NeonBridgeYandex.platformPausedGame && isGameVisible() && isGamePaused()) {
         const resumeButton = document.getElementById("resumeBtn");
         window.NeonBridgeYandex.platformPausedGame = false;
         resumeButton?.click();
-        gameplayStart();
+        return;
       }
+
+      window.NeonBridgeYandex.platformPausedGame = false;
     });
+  }
+
+  function bindBrowserFocusFallback() {
+    const syncFocus = () => {
+      if (document.visibilityState === "hidden" || !document.hasFocus()) {
+        stopAudio();
+        if (window.NeonBridgeYandex.gameplayActive) gameplayStop();
+        return;
+      }
+
+      // Yandex normally sends game_api_resume. Do not start gameplay here:
+      // a manually paused game must remain paused.
+      if (isGameVisible() && !isGamePaused()) resumeAudio();
+    };
+
+    document.addEventListener("visibilitychange", syncFocus);
+    window.addEventListener("blur", () => stopAudio());
+    window.addEventListener("focus", syncFocus);
+  }
+
+  function installAudioGestureUnlock() {
+    const unlock = () => setTimeout(resumeAudio, 0);
+    document.addEventListener("pointerdown", unlock, { capture: true, passive: true });
+    document.addEventListener("touchstart", unlock, { capture: true, passive: true });
   }
 
   function installCloudSaveBridge() {
@@ -175,7 +262,6 @@
     storage.removeItem = function(key) {
       nativeRemoveItem(key);
       if (key === GAME_SAVE_KEY) {
-        // Yandex recommends writing an empty value when cloud progress is cleared.
         player.setData({ [GAME_SAVE_KEY]: "" }, true).catch(() => {});
       }
     };
@@ -184,8 +270,6 @@
   async function initYandex() {
     if (!window.YaGames) {
       try {
-        // Relative path is the official recommended path when the archive is
-        // uploaded to the Yandex Games server.
         await loadScript("/sdk.js");
       } catch (error) {
         return;
@@ -203,8 +287,6 @@
       if (typeof lang === "string" && lang) {
         window.NeonBridgeYandex.language = lang;
         document.documentElement.dataset.yandexLanguage = lang;
-        // The current build is Russian-only. We still perform the mandatory
-        // SDK language detection during startup; unknown languages fall back to Russian.
         document.documentElement.lang = lang === "ru" ? "ru" : "ru";
       }
 
@@ -228,9 +310,7 @@
       const cloudSave = data?.[GAME_SAVE_KEY];
       if (typeof cloudSave === "string" && cloudSave) {
         window.localStorage.setItem(GAME_SAVE_KEY, cloudSave);
-        if (typeof window.updateResumeButton === "function") {
-          window.updateResumeButton();
-        }
+        if (typeof window.updateResumeButton === "function") window.updateResumeButton();
       }
     } catch (error) {
       // Local save remains the fallback when cloud storage is unavailable.
@@ -240,6 +320,7 @@
   async function boot() {
     installAudioFocusGuard();
     await initYandex();
+    await loadStyle(ADAPTIVE_STYLE);
 
     // The game itself is still usable outside Yandex Games.
     await loadCore();
@@ -250,15 +331,18 @@
     await restoreCloudSave();
     installCloudSaveBridge();
     bindGameplayControls();
+    bindEndStateObserver();
     bindPlatformEvents();
+    bindBrowserFocusFallback();
+    installAudioGestureUnlock();
 
-    // Game Ready is called only after the complete game UI and game logic are loaded.
+    // Game Ready is called only after the complete game UI, adaptive shell,
+    // and game logic are loaded and interactive.
     window.NeonBridgeYandex.sdk?.features?.LoadingAPI?.ready?.();
     window.NeonBridgeYandex.ready = true;
   }
 
   boot().catch(() => {
-    // Last-resort fallback: the original game must still be launchable.
     loadCore().catch(() => {});
   });
 })();
