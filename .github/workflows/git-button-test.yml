@@ -1,0 +1,43 @@
+name: Add GIT test button
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  add-git-button:
+    if: "!contains(github.event.head_commit.message, '[skip git button]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add GIT button
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          marker = '<button id="devInfiniteMoneyBtn"'
+          if 'id="gitTestBtn"' in text:
+              raise SystemExit(0)
+          start = text.find(marker)
+          if start == -1:
+              raise SystemExit('Could not find main menu button area')
+          end = text.find('</button>', start)
+          if end == -1:
+              raise SystemExit('Could not find closing button tag')
+          end += len('</button>')
+          insert = '\n        <button id="gitTestBtn" class="dev-money-btn" type="button">GIT</button>'
+          text = text[:end] + insert + text[end:]
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Add GIT test button [skip git button]"
+          git push
