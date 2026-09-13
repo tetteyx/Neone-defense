@@ -43,3 +43,31 @@
 .tower-card[data-tower="pulse"] .tower-copy b{color:#dffbff;text-shadow:0 0 9px rgba(99,230,255,.28)}
 .tower-card[data-tower="pulse"].active{border-color:#63e6ff;background:linear-gradient(135deg,rgba(10,48,67,.98),rgba(5,22,36,.98));box-shadow:0 0 18px rgba(34,230,255,.16),inset 0 0 24px rgba(34,230,255,.08)}
 @keyframes pulseTowerRing{0%{transform:translateY(-50%) scale(.9);opacity:.55}50%{transform:translateY(-50%) scale(1.05);opacity:.9}100%{transform:translateY(-50%) scale(.9);opacity:.55}}
+
+
+/* Версия 76 — счётчик сбитых целей находится в колонке волны. */
+.wave-status {
+  display: grid !important;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+.wave-status span {
+  grid-column: 1;
+}
+.wave-status small {
+  grid-column: 2;
+  align-self: center;
+  white-space: nowrap;
+}
+.wave-status span#kills {
+  grid-column: 1;
+  color: #ff8ca0;
+}
+@media (max-width: 520px) {
+  .wave-status {
+    grid-template-columns: auto auto;
+  }
+}
