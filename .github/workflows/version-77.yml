@@ -11,7 +11,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Update UI
-        run: python3 -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgnaW5kZXguaHRtbCcpCnM9cC5yZWFkX3RleHQoZW5jb2Rpbmc9J3V0Zi04JykKb2xkPSc8ZGl2IGNsYXNzPSJ3YXZlLXN0YXR1cyI+PHNwYW4gaWQ9IndhdmUiPjAg4oiePC9zcGFuPjxzbWFsbD7QstC+0LvQvdCwPC9zbWFsbD48c3BhbiBpZD0ia2lsbHMiPjA8L3NwYW4+PHNtYWxsPtGB0LHQuNGC0L48L3NtYWxsPjwvZGl2PicKbmV3PSc8ZGl2IGNsYXNzPSJ3YXZlLXN0YXR1cyI+PHNtYWxsPldBVkU8L3NtYWxsPjxzcGFuIGlkPSJ3YXZlIj4wIOKInjwvc3Bhbj48c21hbGw+S0lMTFM8L3NtYWxsPjxzcGFuIGlkPSJraWxscyI+MDwvc3Bhbj48L2Rpdj4nCmFzc2VydCBvbGQgaW4gcwpwLndyaXRlX3RleHQocy5yZXBsYWNlKG9sZCxuZXcsMSksZW5jb2Rpbmc9J3V0Zi04JykKcD1QYXRoKCdzdHlsZXMuY3NzJykKcz1wLnJlYWRfdGV4dChlbmNvZGluZz0ndXRmLTgnKQpvbGQ9JycnLndhdmUtc3RhdHVzIHNwYW4gewogIGdyaWQtY29sdW1uOiAxOwp9Ci53YXZlLXN0YXR1cyBzbWFsbCB7CiAgZ3JpZC1jb2x1bW46IDI7CiAgYWxpZ24tc2VsZjogY2VudGVyOwogIHdoaXRlLXNwYWNlOiBub3dyYXA7Cn0nJwpbREDACTED]'))"
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '<div class="wave-status"><span id="wave">0 ∞</span><small>волна</small><span id="kills">0</span><small>сбито</small></div>'
+          new = '<div class="wave-status"><small>WAVE</small><span id="wave">0 ∞</span><small>KILLS</small><span id="kills">0</span></div>'
+          if old not in s:
+              raise SystemExit('status markup not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('styles.css')
+          s = p.read_text(encoding='utf-8')
+          old = '''.wave-status span {
+  grid-column: 1;
+}
+.wave-status small {
+  grid-column: 2;
+  align-self: center;
+  white-space: nowrap;
+}'''
+          new = '''.wave-status small {
+  grid-column: 1;
+  align-self: center;
+  white-space: nowrap;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+.wave-status span {
+  grid-column: 2;
+  justify-self: end;
+}'''
+          if old not in s:
+              raise SystemExit('version 76 layout css not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Commit changes
         run: |
           git config user.name 'github-actions[bot]'
