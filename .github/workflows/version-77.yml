@@ -11,12 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Update UI
-        run: python3 -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgnaW5kZXguaHRtbCcpCnM9cC5yZWFkX3RleHQoZW5jb2Rpbmc9J3V0Zi04JykKb2xkPSc8ZGl2IGNsYXNzPSJ3YXZlLXN0YXR1cyI+PHNwYW4gaWQ9IndhdmUiPjAg4oiePC9zcGFuPjxzbWFsbD7QstC+0LvQvdCwPC9zbWFsbD48c3BhbiBpZD0ia2lsbHMiPjA8L3NwYW4+PHNtYWxsPtGB0LHQuNGC0L48L3NtYWxsPjwvZGl2PicKbmV3PSc8ZGl2IGNsYXNzPSJ3YXZlLXN0YXR1cyI+PHNtYWxsPldBVkU8L3NtYWxsPjxzcGFuIGlkPSJ3YXZlIj4wIOKInjwvc3Bhbj48c21hbGw+S0lMTFM8L3NtYWxsPjxzcGFuIGlkPSJraWxscyI+MDwvc3Bhbj48L2Rpdj4nCmFzc2VydCBvbGQgaW4gcwpwLndyaXRlX3RleHQocy5yZXBsYWNlKG9sZCxuZXcsMSksZW5jb2Rpbmc9J3V0Zi04JykKcD1QYXRoKCdzdHlsZXMuY3NzJykKcz1wLnJlYWRfdGV4dChlbmNvZGluZz0ndXRmLTgnKQpvbGQ9JycnICAud2F2ZS1zdGF0dXMgc3BhbiB7CiAgICBncmlkLWNvbHVtbjogMTsKICB9CiAgLndhdmUtc3RhdHVzIHNtYWxsIHsKICAgIGdyaWQtY29sdW1uOiAyOwogICAgYWxpZ24tc2VsZjogY2VudGVyOwogICAgd2hpdGUtc3BhY2U6IG5vd3JhcDsKICB9JycnCm5ldz0nJycgIC53YXZlLXN0YXR1cyBzbWFsbCB7CiAgICBncmlkLWNvbHVtbjogMTsKICAgIHdoaXRlLXNwYWNlOiBub3dyYXA7CiAgICBsZXR0ZXItc3BhY2luZzogMC4xMmVtOwogICAgdGV4dC10cmFuc2Zvcm06IHVwcGVyY2FzZTsKICAgIG9wYWNpdHk6IDAuNzg7CiAgfQogIC53YXZlLXN0YXR1cyBzcGFuIHsKICAgIGdyaWQtY29sdW1uOiAyOwogICAganVzdGlmeS1zZWxmOiBlbmQ7CiAgfScnJwphc3NlcnQgb2xkIGluIHMKcC53cml0ZV90ZXh0KHMucmVwbGFjZShvbGQsbmV3LDEpLGVuY29kaW5nPSd1dGYtOCcpCg=='))"
+        run: python3 -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgnaW5kZXguaHRtbCcpCnM9cC5yZWFkX3RleHQoZW5jb2Rpbmc9J3V0Zi04JykKb2xkPSc8ZGl2IGNsYXNzPSJ3YXZlLXN0YXR1cyI+PHNwYW4gaWQ9IndhdmUiPjAg4oiePC9zcGFuPjxzbWFsbD7QstC+0LvQvdCwPC9zbWFsbD48c3BhbiBpZD0ia2lsbHMiPjA8L3NwYW4+PHNtYWxsPtGB0LHQuNGC0L48L3NtYWxsPjwvZGl2PicKbmV3PSc8ZGl2IGNsYXNzPSJ3YXZlLXN0YXR1cyI+PHNtYWxsPldBVkU8L3NtYWxsPjxzcGFuIGlkPSJ3YXZlIj4wIOKInjwvc3Bhbj48c21hbGw+S0lMTFM8L3NtYWxsPjxzcGFuIGlkPSJraWxscyI+MDwvc3Bhbj48L2Rpdj4nCmFzc2VydCBvbGQgaW4gcwpwLndyaXRlX3RleHQocy5yZXBsYWNlKG9sZCxuZXcsMSksZW5jb2Rpbmc9J3V0Zi04JykKcD1QYXRoKCdzdHlsZXMuY3NzJykKcz1wLnJlYWRfdGV4dChlbmNvZGluZz0ndXRmLTgnKQpvbGQ9JycnLndhdmUtc3RhdHVzIHNwYW4gewogIGdyaWQtY29sdW1uOiAxOwp9Ci53YXZlLXN0YXR1cyBzbWFsbCB7CiAgZ3JpZC1jb2x1bW46IDI7CiAgYWxpZ24tc2VsZjogY2VudGVyOwogIHdoaXRlLXNwYWNlOiBub3dyYXA7Cn0nJwpbREDACTED]'))"
       - name: Commit changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          rm -f .github/workflows/version-77.yml version-77-trigger.txt
-          git add index.html styles.css .github/workflows/version-77.yml version-77-trigger.txt
+          rm -f .github/workflows/version-77.yml version-77-trigger.txt version-77-trigger-2.txt
+          git add index.html styles.css .github/workflows/version-77.yml version-77-trigger.txt version-77-trigger-2.txt
           git commit -m 'Версия 77'
           git push origin HEAD:version-77-work
