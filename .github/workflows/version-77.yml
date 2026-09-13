@@ -1,0 +1,22 @@
+name: Version 77
+on:
+  push:
+    branches:
+      - version-77-work
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update CSS
+        run: python3 -c "import base64; exec(base64.b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgnc3R5bGVzLmNzcycpCnM9cC5yZWFkX3RleHQoZW5jb2Rpbmc9J3V0Zi04JykKb2xkPScnJy53YXZlLXN0YXR1cyBzcGFuIHsKICBncmlkLWNvbHVtbjogMTsKfQoud2F2ZS1zdGF0dXMgc21hbGwgewogIGdyaWQtY29sdW1uOiAyOwogIGFsaWduLXNlbGY6IGNlbnRlcjsKICB3aGl0ZS1zcGFjZTogbm93cmFwOwp9Ci53YXZlLXN0YXR1cyBzcGFuI2tpbGxzIHsKICBncmlkLWNvbHVtbjogMTsKICBjb2xvcjogI2ZmOGNhMDsKfScnJwpuZXc9JycnLndhdmUtc3RhdHVzIHNwYW4gewogIGdyaWQtY29sdW1uOiAyOwogIGp1c3RpZnktc2VsZjogZW5kOwp9Ci53YXZlLXN0YXR1cyBzbWFsbCB7CiAgZ3JpZC1jb2x1bW46IDE7CiAgYWxpZ24tc2VsZjogY2VudGVyOwogIHdoaXRlLXNwYWNlOiBub3dyYXA7CiAgbGV0dGVyLXNwYWNpbmc6IDAuMTJlbTsKICB0ZXh0LXRyYW5zZm9ybTogdXBwZXJjYXNlOwogIGZvbnQtc2l6ZTogMDsKICBvcGFjaXR5OiAwLjgyOwp9Ci53YXZlLXN0YXR1cyBzbWFsbDo6YWZ0ZXIgewogIGZvbnQtc2l6ZTogMC43MnJlbTsKICBsZXR0ZXItc3BhY2luZzogMC4xNGVtOwp9Ci53YXZlLXN0YXR1cyBzbWFsbDpudGgtb2YtdHlwZSgxKTo6YWZ0ZXIgewogIGNvbnRlbnQ6ICJXQVZFIjsKfQoud2F2ZS1zdGF0dXMgc21hbGw6bnRoLW9mLXR5cGUoMik6OmFmdGVyIHsKICBjb250ZW50OiAiS0lMTFMiOwp9Ci53YXZlLXN0YXR1cyBzcGFuI2tpbGxzIHsKICBncmlkLWNvbHVtbjogMjsKICBjb2xvcjogI2ZmOGNhMDsKfScnJwppZiBvbGQgbm90IGluIHM6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCd2ZXJzaW9uIDc2IGNzcyBibG9jayBub3QgZm91bmQnKQpwLndyaXRlX3RleHQocy5yZXBsYWNlKG9sZCxuZXcsMSksZW5jb2Rpbmc9J3V0Zi04JykK'))"
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/version-77.yml version-77-trigger.txt version-77-trigger-2.txt version-77-trigger-3.txt
+          git add styles.css .github/workflows/version-77.yml version-77-trigger.txt version-77-trigger-2.txt version-77-trigger-3.txt
+          git commit -m 'Версия 77'
+          git push --force origin HEAD:version-77-work
