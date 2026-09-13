@@ -54,11 +54,30 @@
 
   function loadCore() {
     return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = CORE_SCRIPT;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.body.appendChild(script);
+      fetch(CORE_SCRIPT, { cache: "no-store" })
+        .then(response => {
+          if (!response.ok) throw new Error(`Не удалось загрузить ${CORE_SCRIPT}: ${response.status}`);
+          return response.text();
+        })
+        .then(source => {
+          // Тестовый редизайн только установленной башни «Импульс».
+          // Механика, характеристики и логика атаки остаются в game-core.js.
+          const oldPulseBranch = `  } else {\n    ctx.beginPath();\n\n    ctx.arc(\n        tower.x,\n        tower.y,\n        20,\n        0,\n        Math.PI * 2\n    );\n\n    ctx.fill();\n    ctx.stroke();\n  }`;
+
+          const newPulseBranch = `  } else if (tower.type === "pulse") {\n    // Импульс: компактный технологичный реактор вместо простого круга.\n    const now = performance.now();\n    const pulse = 0.5 + 0.5 * Math.sin(now / 210);\n\n    // Внешний энергетический ореол.\n    ctx.save();\n    ctx.globalAlpha = 0.16 + pulse * 0.10;\n    ctx.strokeStyle = type.color;\n    ctx.shadowBlur = 24;\n    ctx.shadowColor = type.color;\n    ctx.lineWidth = 3;\n    ctx.beginPath();\n    ctx.arc(tower.x, tower.y, 24 + pulse * 3, 0, Math.PI * 2);\n    ctx.stroke();\n    ctx.restore();\n\n    // Шестиугольный корпус.\n    ctx.beginPath();\n    for (let i = 0; i < 6; i++) {\n      const angle = -Math.PI / 2 + i * Math.PI / 3;\n      const radius = 21;\n      const x = tower.x + Math.cos(angle) * radius;\n      const y = tower.y + Math.sin(angle) * radius;\n      if (i === 0) ctx.moveTo(x, y);\n      else ctx.lineTo(x, y);\n    }\n    ctx.closePath();\n    ctx.fill();\n    ctx.stroke();\n\n    // Внутренний реактор.\n    const coreGradient = ctx.createRadialGradient(\n        tower.x, tower.y, 1,\n        tower.x, tower.y, 13\n    );\n    coreGradient.addColorStop(0, "#f3ffff");\n    coreGradient.addColorStop(0.24, type.color);\n    coreGradient.addColorStop(0.62, "rgba(34, 230, 255, 0.55)");\n    coreGradient.addColorStop(1, "rgba(34, 230, 255, 0)");\n    ctx.fillStyle = coreGradient;\n    ctx.beginPath();\n    ctx.arc(tower.x, tower.y, 13, 0, Math.PI * 2);\n    ctx.fill();\n\n    ctx.strokeStyle = "#dfffff";\n    ctx.lineWidth = 1.6;\n    ctx.beginPath();\n    ctx.arc(tower.x, tower.y, 9, 0, Math.PI * 2);\n    ctx.stroke();\n\n    // Четыре силовых контакта.\n    ctx.fillStyle = type.color;\n    ctx.shadowBlur = 8;\n    ctx.shadowColor = type.color;\n    for (let i = 0; i < 4; i++) {\n      const angle = i * Math.PI / 2 + Math.PI / 4;\n      const x = tower.x + Math.cos(angle) * 14;\n      const y = tower.y + Math.sin(angle) * 14;\n      ctx.beginPath();\n      ctx.arc(x, y, 2.1, 0, Math.PI * 2);\n      ctx.fill();\n    }\n\n    // Пульсирующее ядро.\n    ctx.fillStyle = "#ffffff";\n    ctx.shadowBlur = 16 + pulse * 8;\n    ctx.shadowColor = type.color;\n    ctx.beginPath();\n    ctx.arc(tower.x, tower.y, 3.2 + pulse * 1.4, 0, Math.PI * 2);\n    ctx.fill();\n  } else {\n    ctx.beginPath();\n\n    ctx.arc(\n        tower.x,\n        tower.y,\n        20,\n        0,\n        Math.PI * 2\n    );\n\n    ctx.fill();\n    ctx.stroke();\n  }`;
+
+          if (!source.includes(oldPulseBranch)) {
+            throw new Error("Не найден блок отрисовки обычной башни для редизайна Импульса");
+          }
+
+          source = source.replace(oldPulseBranch, newPulseBranch);
+
+          const script = document.createElement("script");
+          script.textContent = `${source}\n//# sourceURL=game-core.js`;
+          document.body.appendChild(script);
+          resolve();
+        })
+        .catch(reject);
     });
   }
 
@@ -317,6 +336,12 @@
     }
   }
 
+  function removeAllFullscreenControls() {
+    // Полноэкранный режим больше не показываем ни в одном меню игры.
+    document.getElementById("menuFullscreenBtn")?.remove();
+    document.getElementById("fullscreenBtn")?.remove();
+  }
+
   async function boot() {
     installAudioFocusGuard();
     await initYandex();
@@ -324,6 +349,8 @@
 
     // The game itself is still usable outside Yandex Games.
     await loadCore();
+
+    removeAllFullscreenControls();
 
     const canvas = document.getElementById("game");
     if (canvas) canvas.style.touchAction = "none";
