@@ -12,9 +12,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Restore game core and commit
         run: |
-          git checkout e8627707b5ef56b245050a6a52c6a845a1486f19 -- game-core.js
+          git fetch origin e8627707b5ef56b245050a6a52c6a845a1486f19
+          git checkout e8627707b5ef56b245050a6a845a1486f19 -- game-core.js
           rm -f .github/workflows/version-80.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
