@@ -1,0 +1,95 @@
+name: Version 77
+on:
+  push:
+    branches: [version-77-work]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update UI
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          old = '<div class="wave-status"><span id="wave">0 ∞</span><small>волна</small><span id="kills">0</span><small>сбито</small></div>'
+          new = '<div class="wave-status"><small>WAVE</small><span id="wave">0 ∞</span><small>KILLS</small><span id="kills">0</span></div>'
+          if old not in s:
+              raise SystemExit('status markup not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('styles.css')
+          s = p.read_text(encoding='utf-8')
+          old_css = '''/* Версия 76 — счётчик сбитых целей находится в колонке волны. */
+.wave-status {
+    display: grid !important;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: 8px;
+    row-gap: 2px;
+  }
+  .wave-status span {
+    grid-column: 1;
+  }
+  .wave-status small {
+    grid-column: 2;
+    align-self: center;
+    white-space: nowrap;
+  }
+  .wave-status span#kills {
+    grid-column: 1;
+    color: #ff8ca0;
+  }
+  @media (max-width: 520px) {
+    .wave-status {
+      grid-template-columns: auto auto;
+    }
+  }
+'''
+          new_css = '''/* Версия 77 — неоновый статус волны и уничтоженных целей. */
+.wave-status {
+    display: grid !important;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: 8px;
+    row-gap: 2px;
+  }
+  .wave-status small {
+    grid-column: 1;
+    align-self: center;
+    white-space: nowrap;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.78;
+  }
+  .wave-status span {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .wave-status span#kills {
+    color: #ff8ca0;
+  }
+  @media (max-width: 520px) {
+    .wave-status {
+      grid-template-columns: auto auto;
+    }
+  }
+'''
+          if old_css not in s:
+              raise SystemExit('version 76 css not found')
+          p.write_text(s.replace(old_css, new_css, 1), encoding='utf-8')
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/version-77.yml
+          git add index.html styles.css .github/workflows/version-77.yml
+          git commit -m 'Версия 77'
+          git push origin HEAD:version-77-work
