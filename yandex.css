@@ -83,10 +83,14 @@ body {
 .map-list::-webkit-scrollbar { width: 8px; }
 .map-list::-webkit-scrollbar-thumb { background: rgba(238,241,247,.14); border-radius: 999px; }
 
-/* Панель рейтингового боя на телефоне компактнее: не закрывать поле. */
+/* Панель рейтингового боя в top-bar: на телефоне — горизонтальная строка,
+   чтобы не растягивать полосу статусов на два ряда. */
 @media (max-width: 700px) {
-  .duel-panel { min-width: 0; padding: 6px 9px; font-size: 11px; }
-  .duel-opp-wave { font-size: 15px; }
+  .status-strip>div.duel-panel{display:none;flex:1 1 100%;align-items:center;gap:9px;text-align:left;padding:7px 10px}
+  .duel-panel.is-shown{display:flex!important}
+  .duel-panel .duel-wave{display:inline;margin-right:2px}
+  .duel-panel .duel-label{display:inline;flex:1;min-width:0}
+  .duel-dot{position:static;flex:0 0 7px}
 }
 
 .map-preview {

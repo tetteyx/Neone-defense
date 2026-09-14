@@ -623,11 +623,11 @@
   function removeDevControls() {
     // Читерская DEV-кнопка не должна попадать в ПУБЛИЧНУЮ сборку на Яндекс.Играх.
     // Критерий — именно хост Яндекса: в git-версии (GitHub, Pages, file://,
-    // localhost) кнопка «DEV: ∞ GOLD» остаётся доступной для отладки.
+    // localhost) кнопка «DEV: ВСЕ БАШНИ» остаётся доступной для отладки.
     const host = (location.hostname || "").toLowerCase();
     const onYandex = /(^|\.)yandex\.[a-z.]{2,}$/i.test(host);
     if (state.sdk && onYandex) {
-      document.getElementById("devInfiniteMoneyBtn")?.remove();
+      document.getElementById("devUnlockAllBtn")?.remove();
     } else {
       // Вне платформы кнопка rewarded-рекламы бесполезна — скрываем её.
       document.getElementById("adRewardBtn")?.remove();

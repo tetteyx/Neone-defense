@@ -71,74 +71,58 @@
     if (text != null) e.textContent = text;
     return e;
   }
-  // В яндекс-оболочке канвас центрируется внутри .arena-wrap (place-items:center),
-  // поэтому панель обязана привязываться к ФАКТИЧЕСКОМУ прямоуголю поля, а не к
-  // углу обёртки — иначе она «съезжает» в чёрные поля по бокам канваса (v59.14).
-  function positionPanel() {
-    if (!duel.panel) return;
-    const canvas = document.getElementById("game");
-    if (!canvas) return;
-    const left = Math.max(6, (canvas.offsetLeft | 0) + 6);
-    const top = Math.max(6, (canvas.offsetTop | 0) + 6);
-    if (duel.panel._pl !== left) duel.panel.style.left = (duel.panel._pl = left) + "px";
-    if (duel.panel._pt !== top) duel.panel.style.top = (duel.panel._pt = top) + "px";
-  }
-  window.addEventListener("resize", positionPanel);
+  // Панель боя — НЕ над полем, а в.top-bar'е рядом с кассой (v59.15): box в
+  // .status-strip, тот же стиль, что у счётчиков ВОЛНА/УБИЙСТВА/ЖИЗНИ/CASH.
+  // Никакого абсолютного позиционирования и «съезжания» в яндекс-оболочке.
   function buildPanel() {
-    const arena = document.querySelector(".arena-wrap");
-    if (!arena || duel.panel) return;
+    if (duel.panel) return;
+    const strip = document.querySelector(".status-strip") ||
+      document.querySelector(".topbar") || document.body;
+    if (!strip || !strip.appendChild) return;
     const box = makeEl("div", "duel-panel");
     box.id = "duelPanel";
     box.setAttribute("aria-live", "polite");
-    const head = makeEl("div", "duel-head");
-    const title = makeEl("span", "duel-title");
-    const mode = makeEl("span", "duel-mode");
-    head.append(title, mode);
-    const body = makeEl("div", "duel-body");
     const dot = makeEl("span", "duel-dot");
-    const name = makeEl("span", "duel-opp-name");
-    const wave = makeEl("b", "duel-opp-wave");
-    body.append(dot, name, wave);
-    const foot = makeEl("div", "duel-foot");
-    const delta = makeEl("span", "duel-delta");
-    foot.append(delta);
-    box.append(head, body, foot);
-    arena.appendChild(box);
+    const wave = makeEl("span", "duel-wave", "…");
+    const label = makeEl("small", "duel-label", T("ui.duelTitle"));
+    box.append(dot, wave, label);
+    strip.appendChild(box);
     duel.panel = box;
-    duel.texts = { title, mode, name, wave, delta, dot };
+    duel.texts = { wave, label, dot };
   }
 
   function renderPanel() {
     buildPanel();
     if (!duel.panel) return;
-    positionPanel();
     const t = duel.texts;
-    duel.panel.style.display = duel.running || duel.result ? "block" : "none";
-    if (!duel.running && !duel.result) return;
+    const show = duel.running || duel.result;
+    duel.panel.style.display = show ? "block" : "none";
+    duel.panel.classList.toggle("is-shown", show); // мобильный flex в yandex.css
+    if (!show) return;
 
-    t.title.textContent = T("ui.duelTitle");
-    t.mode.textContent = duel.mode === "yandex" ? T("ui.duelOnline") : T("ui.duelBot");
+    const mode = duel.mode === "yandex" ? T("ui.duelOnline") : T("ui.duelBot");
 
     if (duel.mode === "yandex" && !duel.opponent) {
-      t.name.textContent = "";
-      t.wave.textContent = T("ui.duelSearching");
-      t.delta.textContent = "";
+      t.wave.textContent = "…";
+      t.label.textContent = T("ui.duelSearching");
+      duel.panel.classList.remove("is-losing", "is-stale", "has-result");
       return;
     }
     const oppWave = duel.opponent ? duel.opponent.wave : duel.bot.wave;
-    t.name.textContent = duel.opponent ? duel.opponent.name : "";
+    const who = duel.opponent && duel.opponent.name ? duel.opponent.name : mode;
     t.wave.textContent = String(oppWave);
 
     const stale = duel.opponent && Date.now() - duel.opponent.seenAt > STALE_MS;
     const diff = duel.myWave - oppWave;
-    if (diff > 0) t.delta.textContent = T("ui.duelLead", { n: diff });
-    else if (diff < 0) t.delta.textContent = T("ui.duelBehind", { n: -diff });
-    else t.delta.textContent = T("ui.duelEven");
+    let delta;
+    if (diff > 0) delta = T("ui.duelLead", { n: diff });
+    else if (diff < 0) delta = T("ui.duelBehind", { n: -diff });
+    else delta = T("ui.duelEven");
 
     duel.panel.classList.toggle("is-losing", diff < 0);
     duel.panel.classList.toggle("is-stale", !!stale);
     duel.panel.classList.toggle("has-result", !!duel.result);
-    if (duel.result) t.delta.textContent = duel.result;
+    t.label.textContent = duel.result ? duel.result : who + " · " + delta;
   }
 
   /* ---------------- выбор соперника ---------------- */

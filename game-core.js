@@ -47,7 +47,7 @@ const mapList = document.getElementById("mapList");
 const selectedMapNameEl = document.getElementById("selectedMapName");
 const difficultyList = document.getElementById("difficultyList");
 const selectedDifficultyNameEl = document.getElementById("selectedDifficultyName");
-const devInfiniteMoneyBtn = document.getElementById("devInfiniteMoneyBtn");
+const devUnlockAllBtn = document.getElementById("devUnlockAllBtn");
 const adRewardBtn = document.getElementById("adRewardBtn");
 
 /* ---- Локализация (i18n.js, требование 2.14 Яндекс.Игр) ------------------
@@ -272,11 +272,9 @@ const SPEED_OVERDRIVE_SHAKE_DURATION = SPEED_OVERDRIVE_DURATION;
 const COMBO_RADIUS = 92;
 const COMBO_CHECK_INTERVAL = 5;
 
-// Режим тестирования: на старте игры доступен практически бесконечный запас денег.
-// Покупки и улучшения в этом режиме не уменьшают баланс, чтобы быстро тестировать
-// дорогие башни и комбо.
-let DEV_INFINITE_MONEY = false;
-const TEST_MONEY = 999999999;
+// DEV-режим: по клику открывает ВСЕ башни и модули поддержки (обход
+// волновых отпираний) — для быстрой отладки геймплея и комбо. Деньги не трогает.
+let DEV_ALL_UNLOCKED = false;
 
 /* =========================================================
     БАЛАНС — полностью перенесён из Onslaught 2.2 (slipcor/gaby):
@@ -288,8 +286,8 @@ const TEST_MONEY = 999999999;
       dmgTiers/rngTiers/rateTiers — значения по уровням 1..N (level > N — максимум);
       upgDmg/upgRng/upgRate       — стоимость каждого следующего уровня;
       rateTiers — очки скорострельности (ROF points), интервал = rofK / pts;
-      unlockKills                 — отпирать по НАКОПЛЕННЫМ УБИЙСТВАМ (как в оригинале),
-                                    а не по номеру волны.
+      unlockWave                  — отпирать по НОМЕРУ ВОЛНЫ текущего забега
+                                    (v59.15; как волновые отпирания в оригинале).
     Адаптированные (в оригинале не документированы поминутно): rail, цены
     апгрейдов продвинутых турелей, стартовые деньги ($300). Награда за фрага —
     линейно по номеру волны (моб на волне N = $N), как в оригинале. Комбо и
@@ -299,38 +297,38 @@ const TEST_MONEY = 999999999;
 ========================================================= */
 const towerTypes = {
   booster: {
-    name: "Усилитель", cost: 5000, unlockKills: 450, damage: 0, range: 145, fireRate: 999, color: "#74c476",
-    description: "+40% урон (Damage+, 450 уб.)",
+    name: "Усилитель", cost: 900, unlockWave: 5, damage: 0, range: 145, fireRate: 999, color: "#74c476",
+    description: "+40% урон (Damage+)",
     support: { dmgPct: 0.40 }
   },
   overcharger: {
-    name: "Разгонщик", cost: 3000, unlockKills: 900, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
-    description: "+120% скорость (Rate+, 900 уб.)",
+    name: "Разгонщик", cost: 1400, unlockWave: 11, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
+    description: "+120% скорость (Rate+)",
     support: { ratePct: 1.20 }
   },
   range_amp: {
-    name: "Дальний модуль", cost: 2000, unlockKills: 300, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
-    description: "+100% радиус (Range+, 300 уб.)",
+    name: "Дальний модуль", cost: 500, unlockWave: 3, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
+    description: "+100% радиус (Range+)",
     support: { rngPct: 1.00 }
   },
   reactor: {
-    name: "Реактор", cost: 8500, unlockKills: 1000, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
-    description: "+100% урон (Damage++, 1000 уб.)",
+    name: "Реактор", cost: 2200, unlockWave: 14, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
+    description: "+100% урон (Damage++)",
     support: { dmgPct: 1.00 }
   },
   nexus: {
-    name: "Нексус", cost: 3500, unlockKills: 1100, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
-    description: "+100% урон, −30% радиус и скорость (Big Dmg Exch., 1100 уб.)",
+    name: "Нексус", cost: 1800, unlockWave: 16, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
+    description: "+100% урон, −30% радиус и скорость (Big Dmg Exch.)",
     support: { dmgPct: 1.00, rngPct: -0.30, ratePct: -0.30 }
   },
   rate_xchg: {
-    name: "Частотник", cost: 1200, unlockKills: 600, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
-    description: "+60% скорость, −40% урон, −10% радиус (Rate Exch., 600 уб.)",
+    name: "Частотник", cost: 700, unlockWave: 7, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
+    description: "+60% скорость, −40% урон, −10% радиус (Rate Exch.)",
     support: { ratePct: 0.60, dmgPct: -0.40, rngPct: -0.10 }
   },
   range_xchg: {
-    name: "Ретранслятор", cost: 1000, unlockKills: 750, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
-    description: "+100 радиус, −25% скорость (Range Exch., 750 уб.)",
+    name: "Ретранслятор", cost: 850, unlockWave: 9, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
+    description: "+100 радиус, −25% скорость (Range Exch.)",
     support: { rngFlat: 100, ratePct: -0.25 }
   },
 
@@ -435,8 +433,8 @@ const towerTypes = {
   // ── ПРОДВИНУТЫЕ: Sniper / Fusion / Railgun / Combonly (цена и $ из FAQ) ──
   titan: {
     name: "Титан",
-    cost: 12000,
-    unlockKills: 1400,
+    cost: 3200,
+    unlockWave: 12,
     color: "#e08b52",
     projectileSpeed: 760,
     rofK: 170,
@@ -456,8 +454,8 @@ const towerTypes = {
 
   nova: {
     name: "Нова",
-    cost: 12000,
-    unlockKills: 1500,
+    cost: 3600,
+    unlockWave: 14,
     color: "#eef1f7",
     projectileSpeed: 1400,
     rofK: 150,
@@ -476,8 +474,8 @@ const towerTypes = {
 
   devastator: {
     name: "Опустошитель",
-    cost: 12000,
-    unlockKills: 1300,
+    cost: 2600,
+    unlockWave: 10,
     color: "#c9504f",
     projectileSpeed: 2400,
     rofK: 168,
@@ -495,8 +493,8 @@ const towerTypes = {
 
   singularity: {
     name: "Нуль-коллайдер",
-    cost: 5000,
-    unlockKills: 1600,
+    cost: 2800,
+    unlockWave: 18,
     color: "#eec76a",
     projectileSpeed: 520,
     rofK: 154,
@@ -801,10 +799,6 @@ function clamp(value, min, max) {
 }
 
 function spendMoney(amount) {
-  if (DEV_INFINITE_MONEY) {
-    state.money = TEST_MONEY;
-    return;
-  }
   state.money -= amount;
 }
 
@@ -880,8 +874,9 @@ function isOnRoad(x, y) {
 ========================================================= */
 
 function isTowerUnlocked(type) {
-  const unlockKills = towerTypes[type]?.unlockKills;
-  return !unlockKills || state.kills >= unlockKills;
+  if (DEV_ALL_UNLOCKED) return true;
+  const unlockWave = towerTypes[type]?.unlockWave;
+  return !unlockWave || state.wave >= unlockWave;
 }
 
 function updateTowerAvailability() {
@@ -906,21 +901,29 @@ function updateTowerAvailability() {
     if (icon) icon.removeAttribute("hidden");
     if (mysteryIcon) mysteryIcon.removeAttribute("hidden");
 
-    if (name) name.textContent = unlocked ? def.name : "???";
+    // Статические карточки (база) переведены через data-i18n — берём tl(),
+    // чтобы смена языка не ломалась об этот рендер. У mystery-карточек
+    // атрибута нет — их имя/описание НЕ раскрываем до открытия (v59.15).
+    const getAttr = el => (el && el.getAttribute ? el.getAttribute("data-i18n") : null);
+    const nameKey = getAttr(name);
+    if (name) name.textContent = unlocked ? (nameKey ? tl(nameKey) : def.name) : "???";
     if (desc) {
-      // Описание показываем всегда — даже закрытая башня должна «манить».
-      desc.textContent = def.description || desc.dataset.defaultText || "";
+      const descKey = getAttr(desc);
+      if (!desc.dataset.defaultText && (unlocked || descKey)) {
+        desc.dataset.defaultText = descKey ? tl(descKey) : (def.description || desc.textContent || "");
+      }
+      desc.textContent = unlocked ? (descKey ? tl(descKey) : desc.dataset.defaultText) : "???";
     }
     if (price) price.textContent = unlocked ? `$${def.cost}` : "???";
-    if (mysteryIcon && def.unlockKills) {
-      // число-ключ на иконке «?» (пилюлю рисует CSS ::after)
-      mysteryIcon.dataset.wave = String(def.unlockKills);
+    if (mysteryIcon && def.unlockWave) {
+      // число-ключ на иконке «?» (пилюлю рисует CSS ::after) — номер волны
+      mysteryIcon.dataset.wave = String(def.unlockWave);
     }
     if (unlock) {
       unlock.textContent = unlocked
         ? (unlock.dataset.defaultText || "")
-        : (def.unlockKills
-            ? tl("ui.unlockKills", { n: def.unlockKills })
+        : (def.unlockWave
+            ? tl("ui.unlockShort", { n: def.unlockWave })
             : tl("ui.hiddenTower"));
     }
   });
@@ -2868,7 +2871,7 @@ function selectTowerFromCard(event) {
   if (!towerTypes[type]) return;
 
   if (!isTowerUnlocked(type)) {
-    setHint(tl("ui.lockedKills", { n: towerTypes[type].unlockKills }));
+    setHint(tl("ui.lockedHint", { n: towerTypes[type].unlockWave }));
     return;
   }
 
@@ -3019,14 +3022,13 @@ startGameBtn.addEventListener(
     startGame
 );
 
-if (devInfiniteMoneyBtn) {
-  devInfiniteMoneyBtn.addEventListener("click", () => {
-    DEV_INFINITE_MONEY = !DEV_INFINITE_MONEY;
+if (devUnlockAllBtn) {
+  devUnlockAllBtn.addEventListener("click", () => {
+    DEV_ALL_UNLOCKED = !DEV_ALL_UNLOCKED;
     updateDevMoneyButton();
-    if (DEV_INFINITE_MONEY) {
-      state.money = TEST_MONEY;
-      updateUi();
-    }
+    updateTowerAvailability();
+    updateUi();
+    setHint(tl(DEV_ALL_UNLOCKED ? "ui.devAllOn" : "ui.devAllOff"));
   });
   updateDevMoneyButton();
 }
@@ -4935,7 +4937,7 @@ function loadGame() {
     path = maps[currentMap].path;
     PATH_LENGTH = totalPathLength();
 
-    state.money = DEV_INFINITE_MONEY ? TEST_MONEY : (Number.isFinite(save.money) ? save.money : 170);
+    state.money = Number.isFinite(save.money) ? save.money : 170;
     state.lives = Number.isFinite(save.lives) ? Math.max(0, Math.min(10, save.lives)) : 10;
     state.wave = Number.isFinite(save.wave) ? save.wave : 0;
     state.kills = Number.isFinite(save.kills) ? save.kills : 0;
@@ -5064,12 +5066,12 @@ function showMainMenu() {
 }
 
 function updateDevMoneyButton() {
-  if (!devInfiniteMoneyBtn) return;
-  devInfiniteMoneyBtn.textContent = DEV_INFINITE_MONEY
-    ? "DEV: ∞ GOLD — ВКЛ"
-    : "DEV: ∞ GOLD — ВЫКЛ";
-  devInfiniteMoneyBtn.classList.toggle("active", DEV_INFINITE_MONEY);
-  devInfiniteMoneyBtn.setAttribute("aria-pressed", String(DEV_INFINITE_MONEY));
+  if (!devUnlockAllBtn) return;
+  devUnlockAllBtn.textContent = DEV_ALL_UNLOCKED
+    ? "DEV: ВСЕ БАШНИ — ВКЛ"
+    : "DEV: ВСЕ БАШНИ — ВЫКЛ";
+  devUnlockAllBtn.classList.toggle("active", DEV_ALL_UNLOCKED);
+  devUnlockAllBtn.setAttribute("aria-pressed", String(DEV_ALL_UNLOCKED));
 }
 
 function startGame() {
@@ -5113,7 +5115,7 @@ function startNewGame() {
 function restartGame() {
   setGameOverUi(false);
   state.sessionId = state.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  state.money = DEV_INFINITE_MONEY ? TEST_MONEY : 300;
+  state.money = 300;
   state.lives = 10;
 
   // Duel.js: новая партия — новый зачёт дуэли; панель активна только в рейтинге.

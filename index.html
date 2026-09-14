@@ -64,7 +64,7 @@
         </div>
 
         <button id="startGameBtn" class="menu-start primary" data-i18n="ui.newGame">Новая игра</button>
-        <button id="devInfiniteMoneyBtn" class="dev-money-btn" type="button" aria-pressed="false">DEV: ∞ GOLD — ВЫКЛ</button>
+        <button id="devUnlockAllBtn" class="dev-money-btn" type="button" aria-pressed="false">DEV: ВСЕ БАШНИ — ВЫКЛ</button>
         <button id="newGameBtn" class="menu-new hidden" data-i18n="ui.newGame">Новая игра</button>
         <p class="menu-tip" data-i18n="ui.tip">Совет: нажмите на выбранную башню справа ещё раз, чтобы снять её выбор.</p>
       </div>
@@ -125,60 +125,60 @@
               <button class="tower-card locked mystery" data-tower="devastator" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon devastator" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="9" /><path class="icon-stroke" d="M20 4v9M20 27v9M4 20h9M27 20h9M8 8l7 7M25 25l7 7M32 8l-7 7M15 25l-7 7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="огромный урон одной цели">Открывается за 1300 убийств</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="огромный урон одной цели">???</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="titan" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon titan" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M7 12h10M23 12h10M7 28h10M23 28h10M10 8v7M30 8v7M10 25v7M30 25v7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="поглощает урон соседей-лазеров">Открывается за 1400 убийств</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="поглощает урон соседей-лазеров">???</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="nova" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon nova" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v8M20 28v8M4 20h8M28 20h8M9 9l6 6M25 25l6 6M31 9l-6 6M15 25l-6 6" /><circle class="icon-fill" cx="20" cy="20" r="5" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="пробивает строй насквозь">Открывается за 1500 убийств</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="пробивает строй насквозь">???</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="singularity" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="10" /><circle class="icon-stroke" cx="20" cy="20" r="6" /><circle class="icon-fill" cx="20" cy="20" r="2.8" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="копирует мощь прокачанных соседей">Открывается за 1600 убийств</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="копирует мощь прокачанных соседей">???</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
             </div>
             <div class="boost-list hidden" id="boostList">
               <button class="tower-card support-card locked mystery" data-tower="range_amp" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% радиус">Открывается за 300 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% радиус">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="booster" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v7M20 29v7M4 20h7M29 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+40% урон">Открывается за 450 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+40% урон">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="rate_xchg" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 5v30M5 20h30" /><path class="icon-stroke" d="m13 13 5 5-5 5M27 13l-5 5 5 5" /><circle class="icon-fill" cx="20" cy="20" r="3.5" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+60% скорость, −40% урон, −10% радиус">Открывается за 600 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+60% скорость, −40% урон, −10% радиус">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="range_xchg" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><path class="icon-stroke" d="M8 20h9m-4-4 4 4-4 4M23 20h9m-4-4 4 4-4 4" /><circle class="icon-fill" cx="20" cy="20" r="2.6" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100 радиус, −25% скорость">Открывается за 750 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100 радиус, −25% скорость">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="overcharger" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M18 5 9 22h7l-3 13 14-20h-8l4-10z" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+120% скорость">Открывается за 900 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+120% скорость">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="reactor" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v10M20 26v10M4 20h10M26 20h10" /><path class="icon-stroke" d="m12 12 5 5M23 23l5 5M28 12l-5 5M17 23l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% урон">Открывается за 1000 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% урон">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="nexus" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="10" /><path class="icon-stroke" d="M20 4v32M4 20h32M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% урон, −30% радиус и скорость">Открывается за 1100 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% урон, −30% радиус и скорость">???</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <div class="boost-info">
                 <strong data-i18n="ui.boostInfoTitle">Модули поддержки</strong>
-                <span data-i18n="ui.boostInfoText">Модификаторы открываются за общее число убийств и складываются в зоне действия.</span>
+                <span data-i18n="ui.boostInfoText">Модификаторы открываются по мере прохождения волн и складываются в зоне действия.</span>
               </div>
             </div>
           </section>
