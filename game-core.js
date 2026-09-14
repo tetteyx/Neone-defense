@@ -2363,6 +2363,9 @@ function startWave() {
   state.spawning = true;
   state.nextWaveTimer = 2.25;
 
+  // Duel.js: панель «Дуэль волн» следит за номером волны.
+  try { window.NeonDuel && window.NeonDuel.onWave(waveNumber); } catch (e) {}
+
   // Показываем только последнюю запущенную волну. Параллельные волны
   // продолжают работать внутри state.activeWaves, но их номера не
   // накапливаются в интерфейсе.
@@ -4727,6 +4730,9 @@ function endGame(win) {
 
   state.gameOver = true;
 
+  // Duel.js: подводим итог «кто дожил дольше».
+  try { window.NeonDuel && window.NeonDuel.onGameOver(state.wave); } catch (e) {}
+
   state.waveActive = false;
   state.spawning = false;
 
@@ -5038,6 +5044,9 @@ function restartGame() {
   state.sessionId = state.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   state.money = DEV_INFINITE_MONEY ? TEST_MONEY : 300;
   state.lives = 10;
+
+  // Duel.js: новая партия — новый зачёт дуэли.
+  try { window.NeonDuel && window.NeonDuel.onGameStart(); } catch (e) {}
 
   state.wave = 0;
   state.kills = 0;
