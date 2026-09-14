@@ -489,6 +489,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
   text-transform:uppercase;opacity:1!important;
 }
 .tower-card.mystery .tower-desc{color:rgba(238,241,247,.62)!important}
+/* v59.21: пустая пилюля «.» после открытия добавляла лию строку — карточки
+   новых башен вставали НЕ ровно (выше базовых). Пустая — не занимает места. */
+.tower-card .tower-unlock:empty{display:none!important}
 
 /* ——— 2. Главное меню: hero-колонка ——— */
 .menu-card{
@@ -641,8 +644,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .tower-tip[hidden]{display:none}
 .tower-tip div+div{margin-top:3px}
 .tower-tip div:first-child{font-family:var(--cm-font-mono);font-weight:800;font-size:11px;letter-spacing:.04em;color:var(--cm-gold)}
-/* «Тайные» (неволновые) башни в рейтинговом бою скрыты целиком, а не «???» */
-.ranked-mode .tower-card.locked{display:none!important}
+/* «Тайные» башни в рейтинговом бою НЕ удаляются из списка — как в обычной
+   игре они «???»-мистификации до своей волны (решение пользователя v59.21). */
 .menu-ranked{grid-column:1/-1;justify-self:center;display:inline-block;margin:6px auto 0;min-height:36px;padding:8px 20px;border:1px solid rgba(232,182,76,.5);border-radius:999px;background:rgba(232,182,76,.08);color:var(--cm-gold);font-family:var(--cm-font-mono);font-weight:800;font-size:.78rem;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;transition:background .15s ease,transform .15s ease}
 .menu-ranked:hover{background:rgba(232,182,76,.18);transform:translateY(-1px)}
 /* Боевой HUD: в рейтинговом бою — ни паузы, ни ускорителя; кнопка выхода -> «Сдаться» */
