@@ -1,24 +1,607 @@
 /* Version 81 wrapper: preserve the complete existing stylesheet and add only the requested UI layer. */
 @import url("styles-original-81.css");
 .lives-status > small { display:none !important; }
-.tower-card[data-tower].active:not(.locked){border-color:#63e6ff !important;background:linear-gradient(135deg,rgba(10,48,67,.98),rgba(5,22,36,.98)) !important;box-shadow:0 0 18px rgba(34,230,255,.18),inset 0 0 24px rgba(34,230,255,.08) !important}
+.tower-card[data-tower].active:not(.locked){border-color:#74c476 !important;background:linear-gradient(135deg,rgba(13,16,26,.98),rgba(9,11,20,.98)) !important;box-shadow:none}
 .tower-card[data-tower]:not(.active) .tower-icon{filter:none !important;transform:none !important}
-.tower-card[data-tower].active:not(.locked) .tower-icon{filter:drop-shadow(0 0 5px #63e6ff) drop-shadow(0 0 12px rgba(34,230,255,.75)) !important;transform:scale(1.08) !important}
-.tower-card[data-tower].active:not(.locked) .tower-icon .icon-bg{fill:#63e6ff !important;opacity:.14 !important}
+.tower-card[data-tower].active:not(.locked) .tower-icon{filter:none !important;transform:scale(1.08) !important}
+.tower-card[data-tower].active:not(.locked) .tower-icon .icon-bg{fill:#74c476 !important;opacity:.14 !important}
 .tower-card[data-tower].active:not(.locked) .tower-icon .icon-stroke{stroke-width:2.2 !important}
 
-/* VERSION 84 — вместо синего CORE оставлен простой красный круг в конце дороги. */
-.arena-wrap{position:relative;overflow:hidden;--base-y:34.375%;--core-size:5.6%;--core-right:9.8%}
-body:has(#mapList .map-card[data-map="circuit"].active) .arena-wrap{--base-y:78.125%}
-body:has(#mapList .map-card[data-map="coreline"].active) .arena-wrap{--base-y:46.875%}
+/* VERSION 85 — ядро больше не CSS-наложение: анимированный реактор рисует
+   drawCore() прямо на canvas в конце дороги, поэтому красное кольцо (::before),
+   затемнение справа (::after) и переменные позиционирования удалены. */
+.arena-wrap{position:relative;overflow:hidden}
 
-/* Затемнение справа оставляет свободную площадку в конце дороги. */
-.arena-wrap::after{content:"";position:absolute;right:0;top:0;width:14%;height:100%;background:linear-gradient(90deg,rgba(7,17,27,0),rgba(5,13,22,.58) 38%,rgba(4,11,19,.92) 100%);z-index:3;pointer-events:none}
+/* =========================================================
+   VERSION 86 — дизайн-слой: полировка HUD, панели, меню,
+   паузы и финальной модалки. Только цвет/свечение/анимации,
+   layout намеренно не трогаем (yandex.css остаётся главным).
+========================================================= */
 
-/* Красный защитный круг стоит ровно у точки, где заканчивается дорога. */
-.arena-wrap::before{content:"";position:absolute;right:var(--core-right);top:var(--base-y);width:var(--core-size);height:var(--core-size);transform:translateY(-50%);box-sizing:border-box;border-radius:50%;border:3px solid #ff405d;background:radial-gradient(circle,#ff405d 0 30%,#b5102d 31% 64%,#4a0715 65% 100%);box-shadow:0 0 0 3px rgba(36,7,14,.9),0 0 14px rgba(255,48,82,.95),0 0 28px rgba(255,48,82,.45),inset 0 0 10px rgba(255,190,200,.55);z-index:5;pointer-events:none}
-
-@media(max-width:700px){
-  .arena-wrap{--core-size:5.6%;--core-right:9.8%}
-  .arena-wrap::after{width:14%;background:linear-gradient(90deg,rgba(7,17,27,0),rgba(5,13,22,.58) 38%,rgba(4,11,19,.92) 100%)}
+/* --- Хедер игры: компактный неоновый логотип --- */
+.topbar h1{
+  font-size:clamp(1.35rem,2.4vw,2.1rem)!important;
+  font-weight:900;letter-spacing:.07em;text-transform:uppercase;line-height:1;
+  background:linear-gradient(90deg,#eef1f7,#74c476 45%,#74c476);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:none;
 }
+
+/* --- Статус-полоса: флекс, чтобы кнопке «Комбинации» не хватало колонки --- */
+.status-strip{display:flex!important;flex-wrap:wrap;justify-content:flex-end;align-items:stretch;gap:8px;min-width:0}
+.status-strip>div{flex:1 1 92px}
+.combo-trigger{flex:0 0 auto;align-self:stretch}
+
+/* --- Карточки статусов: стеклянные, с верхним неоновым срезом --- */
+.status-strip>div{
+  border-radius:10px!important;
+  background:linear-gradient(180deg,rgba(15,19,31,.92),rgba(9,11,20,.94))!important;
+  box-shadow:0 6px 22px rgba(0,0,0,.35),inset 0 1px 0 rgba(116,196,118,.10);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.status-strip>div:hover{transform:translateY(-1px)}
+.wave-status>div{border:0;background:transparent;box-shadow:none}
+
+/* --- Поле: неоновая рамка арены --- */
+canvas#game{
+  border:1px solid rgba(116,196,118,.35)!important;border-radius:12px!important;
+  box-shadow:0 22px 70px rgba(0,0,0,.42),0 0 0 1px rgba(9,11,20,.9),inset 0 0 0 1px rgba(116,196,118,.05)!important;
+}
+.hint-bar{border-left:3px solid rgba(116,196,118,.7);background:rgba(9,11,20,.78);border-radius:10px}
+
+/* --- Правая панель: секции с акцентной шапкой --- */
+.panel-section{
+  border-radius:12px!important;
+  background:linear-gradient(180deg,rgba(13,16,26,.95),rgba(9,11,20,.95))!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(116,196,118,.08);
+}
+.panel-section h2{
+  color:rgba(238,241,247,.72);font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;
+}
+.panel-section h2::before{content:"";width:14px;height:2px;border-radius:2px;background:linear-gradient(90deg,#74c476,transparent);box-shadow:none}
+
+.tower-card:not(.locked){transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.tower-card:not(.locked):hover{transform:translateY(-1px);border-color:rgba(116,196,118,.55);box-shadow:0 6px 18px rgba(0,0,0,.35)}
+
+/* --- Кнопки управления волной --- */
+.control-row button,.wave-bottom-actions .menu-back{border-radius:10px}
+#nextWaveBtn{box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+#pauseBtn:hover:not(:disabled),#speedBtn:hover:not(:disabled){border-color:rgba(116,196,118,.6)}
+
+/* --- Прокачка: кнопка продажи в красной гамме, сетка покрупнее --- */
+#sellBtn:not(:disabled){border-color:rgba(223,106,95,.55);background:linear-gradient(180deg,#221836,#1a1330);color:#cf8e97;box-shadow:none}
+#sellBtn:not(:disabled):hover{border-color:#df6a5f;box-shadow:none}
+
+/* --- Пауза и финал: стекло с неоновой окантовкой --- */
+.pause-overlay{background:rgba(9,11,20,.62)!important;backdrop-filter:blur(7px) saturate(.9)}
+.pause-card,.modal-card{
+  border:1px solid rgba(116,196,118,.35)!important;border-radius:18px!important;
+  background:linear-gradient(180deg,rgba(10,13,22,.98),rgba(9,11,20,.99))!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(238,241,247,.12)!important;
+}
+.pause-icon{color:#eef1f7;text-shadow:none;animation:pausePulse 2.2s ease-in-out infinite}
+@keyframes pausePulse{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+#endTitle{color:#cf8e97;text-shadow:none}
+
+/* --- Главное меню: живость --- */
+.menu-logo span{animation:logoGlow 3.4s ease-in-out infinite}
+@keyframes logoGlow{
+  0%,100%{text-shadow:none}
+  50%{text-shadow:none}
+}
+.difficulty-card{transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.difficulty-card:hover:not(.active){transform:translateY(-2px);border-color:#74c476;box-shadow:none}
+
+.menu-start{position:relative;overflow:hidden}
+.menu-start::before{
+  content:"";position:absolute;top:-50%;bottom:-50%;left:-40%;width:28%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);
+  transform:translateX(-160%) skewX(-18deg);animation:startShine 3.4s ease-in-out infinite;pointer-events:none;
+}
+@keyframes startShine{0%{transform:translateX(-160%) skewX(-18deg)}45%,100%{transform:translateX(520%) skewX(-18deg)}}
+.menu-tip{font-style:italic;opacity:.85}
+
+/* --- Скроллбары в тон --- */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:rgba(10,13,22,.9)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#2a3350,#262e46);border-radius:8px;border:2px solid rgba(10,13,22,.9)}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#4b6394,#2a3350)}
+
+/* --- Сердечки: компактная сетка 6×2, всегда вмещаются в карточку жизней --- */
+.lives-status{flex:1 1 auto!important;min-width:0!important}
+.heart-lives{
+  min-height:0;display:grid;grid-template-columns:repeat(6,1fr);
+  gap:0 2px;justify-items:center;align-content:center;
+}
+.life-heart{font-size:10px;line-height:1.35}
+.life-heart.alive{filter:none}
+
+/* --- Модалка комбинаций (перебиваем runtime-<style> комбо-UI) --- */
+#comboModal .combo-row{transition:border-color .15s ease,background .15s ease}
+#comboModal .combo-row:hover{border-color:rgba(116,196,118,.35);background:rgba(116,196,118,.04)}
+#comboModal .combo-result-badge{text-shadow:none}
+
+/* =========================================================
+   VERSION 87 — меню: карточки карт с РЕАЛЬНЫМИ маршрутами
+   (SVG генерирует renderMapCards() из game-core.js) и
+   кнопка открытия редактора.
+========================================================= */
+.menu-map-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px}
+.menu-map-head h2{margin-bottom:0}
+.menu-editor-btn{
+  border:1px solid rgba(116,196,118,.45);border-radius:999px;
+  background:rgba(116,196,118,.08);color:#8fd0e8;
+  padding:6px 13px;font-weight:800;font-size:.76rem;letter-spacing:.07em;text-transform:uppercase;
+  cursor:pointer;transition:background .15s ease,box-shadow .15s ease,transform .15s ease;
+}
+.menu-editor-btn:hover{background:rgba(116,196,118,.18);box-shadow:none;transform:translateY(-1px)}
+
+.map-list{grid-template-columns:repeat(auto-fill,minmax(148px,1fr))!important}
+.map-card{
+  position:relative;gap:8px!important;border-radius:12px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(13,16,26,.96),rgba(9,11,20,.96));
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.map-card:hover{transform:translateY(-2px);border-color:rgba(116,196,118,.6);box-shadow:0 12px 26px rgba(0,0,0,.45)}
+.map-card.active{
+  border-color:#eec76a!important;background:linear-gradient(180deg,rgba(21,27,43,.97),rgba(13,16,26,.97))!important;
+  box-shadow:0 0 0 1px rgba(116,196,118,.35);
+}
+.map-card .map-preview{height:118px!important;border-color:rgba(116,196,118,.26)!important;border-radius:9px}
+.map-card .map-preview::after{display:none!important}  /* старые абстрактные градиенты отключены */
+.map-preview.real svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.map-card b{font-size:.92rem}
+.map-card small{font-size:.72rem}
+
+.map-card-del{
+  position:absolute;top:7px;right:7px;z-index:2;
+  width:22px;height:22px;display:grid;place-items:center;
+  border-radius:6px;border:1px solid rgba(201,80,79,.5);
+  background:rgba(10,13,22,.85);color:#cf8e97;font-size:11px;font-weight:900;
+  cursor:pointer;transition:background .12s ease,color .12s ease;
+}
+.map-card-del:hover{background:rgba(223,106,95,.3);color:#eef1f7}
+
+.map-card-new{opacity:.92}
+.map-card-new:hover{opacity:1}
+.map-card-new .map-preview-new{
+  display:grid;place-items:center;background-image:none!important;
+  border-style:dashed!important;color:#74c476;font-size:42px;font-weight:300;line-height:1;
+}
+
+/* =========================================================
+   VERSION 88 — правая панель: колодка башен, табы, карточки
+   Компактнее, читаемее, ясная иерархия «иконка → имя → цена».
+========================================================= */
+
+/* --- Переключатель Башни / Усиления: сегментированный контрол --- */
+.panel-switch{
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;
+  border:1px solid #262e46;border-radius:12px;background:rgba(10,13,22,.85);
+}
+.panel-switch-btn{
+  border:1px solid transparent;border-radius:9px;background:transparent;
+  color:rgba(238,241,247,.54);padding:9px 6px;font-weight:800;font-size:.8rem;
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  transition:background .15s ease,color .15s ease,box-shadow .15s ease;
+}
+.panel-switch-btn:hover{color:rgba(238,241,247,.72)}
+.panel-switch-btn.active{
+  color:#05070d;background:linear-gradient(180deg,#74c476,#4b6394);
+  box-shadow:none;border-color:transparent;
+}
+
+/* --- Колодка башен: аккуратный один столбец (плитки 2×N отменены) --- */
+.tower-list,.boost-list{gap:7px!important}
+.tower-card{
+  position:relative;border-radius:11px!important;
+  padding:9px 10px!important;min-height:60px!important;
+  grid-template-columns:38px minmax(0,1fr) auto!important;
+  align-items:center;gap:6px 10px!important;
+  background:linear-gradient(180deg,rgba(10,13,22,.94),rgba(9,11,20,.94));
+  border:1px solid #212840;overflow:hidden;
+}
+.tower-card .tower-icon,
+.tower-card .tower-mystery-icon{width:38px;height:38px;grid-column:1;align-self:center}
+.tower-card .tower-icon{background:rgba(255,255,255,.04);border-radius:10px;padding:3px}
+.tower-card .tower-copy{min-width:0;display:grid;gap:2px}
+.tower-copy b{font-size:.86rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tower-copy > span{font-size:.75rem;color:rgba(238,241,247,.54);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* цена — компактная пилюля в правом столбце */
+.tower-card strong{
+  grid-column:3;justify-self:end;width:auto!important;min-height:24px;
+  display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;
+  background:rgba(116,196,118,.10);border:1px solid rgba(116,196,118,.35);
+  color:#8fd0e8!important;font-size:.78rem!important;font-weight:900;
+  font-variant-numeric:tabular-nums;
+}
+.tower-card:not(.locked):hover strong{background:rgba(116,196,118,.18)}
+
+/* активная карточка: акцентная полоса + подсветка */
+.tower-card.active::before{
+  content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;
+  border-radius:0 4px 4px 0;background:#eec76a;box-shadow:none;
+}
+.tower-card.active strong{border-color:rgba(116,196,118,.5);background:rgba(116,196,118,.12);color:#8fd0e8!important}
+
+/* заблокированные: аккуратное затемнение, «?» спокойнее */
+.tower-card.locked{opacity:.5;filter:saturate(.4)}
+.tower-card.locked:hover{transform:none!important;box-shadow:none!important;border-color:#212840!important}
+.tower-card.locked strong{background:rgba(152,162,184,.07);border-color:rgba(152,162,184,.2);color:rgba(238,241,247,.54)!important}
+.tower-mystery-icon{opacity:.85}
+
+/* --- Остальная панель: выравнивание ритма --- */
+.wave-card{border-radius:11px;padding:11px}
+.wave-card button{border-radius:9px}
+.action-grid,.control-row{gap:6px}
+.action-grid button,.control-row button{border-radius:9px;font-weight:800;transition:transform .12s ease,border-color .15s ease,box-shadow .15s ease}
+.action-grid button:hover:not(:disabled),.control-row button:hover:not(:disabled){transform:translateY(-1px)}
+.selection-info{border-radius:11px}
+.boost-info{font-size:.82rem;color:rgba(238,241,247,.54);line-height:1.5}
+
+/* =========================================================
+   VERSION 89 — rewarded-кнопка и переключатель языка (ru/en).
+========================================================= */
+.ad-reward-btn{
+  flex:1 1 auto;min-width:0;text-align:center;
+  border:1px solid rgba(116,196,118,.42)!important;
+  background:linear-gradient(180deg,rgba(22,30,44,.92),rgba(12,16,30,.94))!important;
+  color:#8fd0e8!important;
+}
+.ad-reward-btn:hover:not(:disabled){border-color:#74c476!important;box-shadow:none}
+.ad-reward-btn:disabled{opacity:.45;cursor:default;box-shadow:none!important}
+
+.lang-switch{display:inline-flex;gap:4px}
+.lang-btn{
+  border:1px solid #2a3350;background:rgba(13,16,26,.85);color:rgba(238,241,247,.54);
+  border-radius:8px;padding:6px 12px;font:800 12px/1 system-ui,sans-serif;
+  letter-spacing:.04em;cursor:pointer;transition:all .15s ease;
+}
+.lang-btn:hover{border-color:#74c476;transform:translateY(-1px)}
+.lang-btn.active{
+  border-color:#eec76a;color:#05070d;
+  background:linear-gradient(180deg,#74c476,#4b6394);
+  box-shadow:none;
+}
+.menu-lang-row{justify-content:space-between}
+
+/* =========================================================
+   VERSION 90 — дизайн-система «Commons · Calm Minimal»
+   (структура — референс commonsmade.com, палитра — спокойная, чистая)
+   Холодный белый #eef1f7 на глубоком slate-navy (#151a2b); спокойные
+   акценты: песок #eec76a, шалфей #74c476, янтарь #e8a04c,
+   приглушённая вишня #df6a5f, дымный azure #5b9fd6. Ноль неона и
+   ноль «кислоты»: глубина — мягкими тенями, типографика — serif
+   только в меню, везде остальном — system/mono; pill; лёгкое зерно.
+   ========================================================= */
+:root{
+  --cm-shell:#090b14; --cm-bg:#151a2b; --cm-surface:#1f2638; --cm-raised:#273049;
+  --cm-well:#10141f; --cm-deep:#0d1018; --cm-cast:#05070d;
+  --cm-cream:#eef1f7; --cm-soft:#f6f8fc;
+  --cm-muted:rgba(238,241,247,.54); --cm-faint:rgba(238,241,247,.36);
+  --cm-line:rgba(238,241,247,.13);
+  --cm-lime:#eec76a; --cm-leaf:#74c476; --cm-amber:#e8a04c; --cm-gold:#e8b64c;
+  --cm-coral:#df6a5f; --cm-red:#c9504f; --cm-indigo:#5b9fd6; --cm-moss:#4b6394;
+  --cm-font-display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --cm-font-body:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;
+  --cm-font-mono:"JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;
+  --cm-settle:cubic-bezier(.22,1,.36,1);
+  --cm-raised-shadow:10px 10px 24px var(--cm-cast),inset 0 1px 0 rgba(238,241,247,.07),inset 0 0 0 1px rgba(238,241,247,.035);
+  --cm-pressed-shadow:inset 5px 5px 10px rgba(5,7,13,.75),inset 0 -1px 0 rgba(238,241,247,.05);
+  --cm-ambient:0 24px 70px rgba(0,0,0,.45);
+}
+
+/* — типографика — */
+body{font-family:var(--cm-font-body)}
+.menu-logo span{font-family:var(--cm-font-display);font-weight:600;letter-spacing:-.04em;color:var(--cm-cream);text-shadow:none!important}
+.menu-logo strong{font-family:var(--cm-font-mono)!important;font-weight:500!important;letter-spacing:.24em;text-transform:uppercase;color:var(--cm-muted)!important;font-size:clamp(.95rem,1.6vw,1.3rem)!important;text-shadow:none!important}
+.menu-subtitle{color:var(--cm-muted)!important;text-shadow:none!important;font-weight:600}
+.menu-section h2{font-family:var(--cm-font-display);text-transform:none;letter-spacing:-.01em;color:var(--cm-cream)}
+.panel-section h2{font-family:var(--cm-font-mono);font-size:.72rem;letter-spacing:.16em;color:var(--cm-muted)}
+.topbar h1{
+  font-family:var(--cm-font-display)!important;font-weight:600!important;
+  text-transform:none!important;letter-spacing:-.01em!important;
+  font-size:clamp(1rem,1.8vw,1.35rem)!important;
+  background:none!important;color:var(--cm-muted)!important;
+  filter:none!important;
+}
+.status-strip small,.auto-wave-badge,.boost-info,.tower-copy>span,.selected-difficulty,.selected-map,.menu-tip{font-family:var(--cm-font-mono)}
+.status-strip small,.auto-wave-badge{letter-spacing:.14em;text-transform:uppercase;font-size:.62rem;color:var(--cm-muted)}
+#money,#wave,#kills{font-variant-numeric:tabular-nums}
+.selected-difficulty strong,.selected-map strong{color:var(--cm-lime)!important;text-shadow:none!important;font-weight:800}
+.difficulty-card b,.map-card b{font-family:var(--cm-font-display);font-weight:600}
+.difficulty-card small,.map-card small{color:var(--cm-muted)!important;font-family:var(--cm-font-mono);letter-spacing:.03em}
+#endTitle,.end-title{font-family:var(--cm-font-display)!important;color:var(--cm-cream)!important;text-shadow:none!important;letter-spacing:-.02em}
+#endText{color:var(--cm-muted)}
+
+/* — неоновое свечение: отменено системно — */
+@keyframes logoGlow{0%,100%{text-shadow:none}50%{text-shadow:none}}
+@keyframes pausePulse{0%,100%{opacity:.7}50%{opacity:1}}
+.pause-icon{color:var(--cm-cream)!important;text-shadow:none!important;animation-name:pausePulse!important}
+.tower-icon,.topbar h1,.life-heart.alive,.tower-card[data-tower].active:not(.locked) .tower-icon{filter:none!important}
+.menu-logo span{text-shadow:none!important}
+.stat-value-range,.stat-value-speed,.stat-delta,.money-fx-label,[class*="stat-"]{text-shadow:none!important}
+#comboModal .combo-result-badge{text-shadow:none!important}
+.tower-card[data-tower].active:not(.locked) .tower-copy b{text-shadow:none!important}
+::-moz-selection{background:rgba(238,199,110,.28);color:var(--cm-cream)}
+::selection{background:rgba(238,199,110,.28);color:var(--cm-cream)}
+
+/* — поверхности: depth светом, не обводкой — */
+.menu-section{
+  border:1px solid var(--cm-line)!important;border-radius:24px!important;
+  background:linear-gradient(135deg,rgba(238,241,247,.05),rgba(238,241,247,.015))!important;
+  box-shadow:var(--cm-raised-shadow)!important;
+}
+.difficulty-card,.map-card{
+  border:1px solid var(--cm-line)!important;border-radius:18px!important;
+  background:linear-gradient(135deg,#1f2638,#10141f)!important;color:var(--cm-cream);
+  box-shadow:6px 6px 16px rgba(5,7,13,.8),inset 0 1px 0 rgba(238,241,247,.05)!important;
+}
+.difficulty-card.active,.map-card.active{
+  border-color:rgba(238,199,110,.55)!important;
+  background:linear-gradient(135deg,rgba(238,199,110,.07),rgba(238,241,247,.02))!important;
+  box-shadow:6px 6px 16px rgba(5,7,13,.8),inset 0 1px 0 rgba(238,241,247,.06),0 0 0 1px rgba(238,199,110,.35)!important;
+}
+.difficulty-card:hover:not(.active),.map-card:hover:not(:disabled){transform:translateY(-2px);border-color:rgba(238,241,247,.28)!important;box-shadow:8px 10px 22px rgba(5,7,13,.9),inset 0 1px 0 rgba(238,241,247,.06)!important}
+.difficulty-icon{border-color:rgba(238,241,247,.28)!important;background:var(--cm-well)!important;color:var(--cm-cream)!important;box-shadow:inset 0 1px 0 rgba(238,241,247,.06)!important;border-radius:14px}
+.map-preview{background-color:var(--cm-well)!important}
+.tower-card,.boost-card-item{border:1px solid var(--cm-line)!important;border-radius:14px!important}
+.tower-card[data-tower].active:not(.locked){
+  border-color:rgba(238,199,110,.5)!important;
+  background:linear-gradient(135deg,rgba(238,199,110,.08),rgba(238,241,247,.02))!important;
+  box-shadow:var(--cm-pressed-shadow),0 0 0 1px rgba(238,199,110,.3)!important;
+}
+.tower-card[data-tower].active:not(.locked) .tower-icon{transform:scale(1.05)!important}
+.tower-card[data-tower].active:not(.locked) .tower-icon .icon-bg{fill:#eec76a!important;opacity:.10!important}
+
+/* — главное меню: фон языка референса (едва видимая сетка + амбиент + зерно) — */
+.main-menu{
+  background:
+    radial-gradient(1100px 620px at 16% -12%,rgba(238,241,247,.04),transparent 60%),
+    radial-gradient(1000px 700px at 88% 112%,rgba(75,99,148,.16),transparent 55%),
+    linear-gradient(rgba(238,241,247,.014) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(238,241,247,.014) 1px,transparent 1px),
+    var(--cm-bg)!important;
+  background-size:auto,auto,54px 54px,54px 54px,auto;
+}
+.main-menu::after{
+  content:"";position:fixed;inset:-80px;pointer-events:none;z-index:0;opacity:.22;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.16'/></svg>");
+  animation:cmGrain 1.2s steps(4) infinite;
+}
+.main-menu>*{position:relative;z-index:1}
+@keyframes cmGrain{0%,100%{transform:translate(0)}17%{transform:translate(-6px,-10px)}33%{transform:translate(4px,-14px)}50%{transform:translate(12px,8px)}67%{transform:translate(9px,3px)}83%{transform:translate(-4px,6px)}}
+
+/* — кнопки: pill; primary — ровный янтарь, без «конфетного» градиента — */
+.menu-start{
+  font-family:var(--cm-font-display)!important;
+  font-size:clamp(1.45rem,2.6vw,2.1rem)!important; /* в v81 текст прятался под font-size:0, метка печаталась :after по-русски */
+  background:#e8a04c!important;color:#1a1330!important;
+  border:none!important;border-radius:999px!important;font-weight:700;letter-spacing:-.01em;
+  box-shadow:0 10px 26px rgba(5,7,13,.6),inset 0 1px 0 rgba(255,255,255,.35)!important;
+  transition:transform .18s var(--cm-settle),box-shadow .18s var(--cm-settle),background .18s;
+}
+.menu-start:after{content:none!important}
+.menu-start::before{background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent)!important}
+.menu-start:hover:not(:disabled){transform:translateY(-1px);background:#f0ac5e!important;box-shadow:0 14px 30px rgba(5,7,13,.7),inset 0 1px 0 rgba(255,255,255,.4)!important}
+.menu-start:active:not(:disabled){transform:scale(.97);box-shadow:0 6px 14px rgba(5,7,13,.7),inset 0 3px 8px rgba(26,19,48,.25)!important}
+.menu-editor-btn,.lang-btn,.panel-switch-btn,.menu-settings-btn,.ad-reward-btn{border-radius:999px!important}
+.lang-btn.active{background:#eec76a!important;color:#1a1330!important;border-color:transparent!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)!important}
+.panel-switch-btn.active{background:#eec76a!important;color:#1a1330!important}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid rgba(238,199,110,.65);outline-offset:2px}
+
+/* — стеклянные оверлеи — */
+.pause-overlay,.overlay,#pauseOverlay{backdrop-filter:blur(16px) saturate(115%)}
+.end-modal,.modal-card,#comboModal .combo-card{backdrop-filter:blur(18px) saturate(115%);box-shadow:var(--cm-ambient)!important}
+#comboModal .combo-card{border:1px solid var(--cm-line)!important;background:linear-gradient(180deg,rgba(20,25,40,.96),rgba(10,13,22,.98))!important;border-radius:24px!important}
+#comboModal .combo-arrow{color:var(--cm-leaf)!important}
+#comboModal .combo-trigger{background:linear-gradient(135deg,#1f2638,#10141f)!important;border:1px solid var(--cm-line)!important;box-shadow:6px 6px 16px rgba(5,7,13,.8),inset 0 1px 0 rgba(238,241,247,.05)!important;color:var(--cm-cream)!important;border-radius:999px!important}
+
+/* — HUD-капсулы — */
+.cash-status,.lives-status,.wave-status{
+  background:rgba(10,13,22,.86)!important;border:1px solid var(--cm-line)!important;
+  border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(238,241,247,.04)!important;
+}
+#money{color:var(--cm-gold)!important}
+.wave-stat #kills{color:var(--cm-coral)!important}
+
+/* — уважить prefers-reduced-motion — */
+@media (prefers-reduced-motion:reduce){
+  .main-menu::after{animation:none}
+  .menu-start::before{animation:none}
+  .pause-icon{animation:none}
+  .menu-logo span{animation:none}
+}
+@media (max-width:700px){
+  .main-menu::after{display:none} /* зерно на слабых мобильных GPU не нужно */
+}
+
+/* =========================================================
+   VERSION 91 — pre-release: устранение видимых неровностей
+   (по скриншоту Game Over): модалка в viewport, панель без
+   клиппинга, ровный HUD, цены башен в линию, компактные сердца.
+   ========================================================= */
+
+/* 1. Финальная модалка: никогда не вылезает за экран */
+.modal{padding:12px}
+.modal-card{
+  max-height:calc(100dvh - 24px);
+  overflow-y:auto;overscroll-behavior:contain;
+  padding:20px 22px!important;
+}
+#endTitle{font-size:clamp(1.3rem,2.4vw,1.7rem)!important;line-height:1.2;margin-bottom:6px}
+#endText{margin-bottom:14px!important}
+.modal-actions{margin-top:14px!important;gap:8px!important}
+.modal-actions button{min-height:46px}
+.pause-card{max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}
+
+/* 2. Правая колонка: нижние кнопки («📺 Реклама», настройки) не обрезаются */
+.panel{overflow-y:auto!important;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin}
+
+/* 3. Status-полоса: одинаковые капсулы и базовая линия */
+.status-strip>div{
+  display:flex;align-items:center;justify-content:center;
+  gap:10px;min-height:46px;padding:9px 14px!important;
+}
+#money,#wave,#kills,#hp{letter-spacing:0;font-variant-numeric:tabular-nums}
+.heart-lives{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:nowrap}
+.life-heart{font-size:15px;line-height:1}
+.life-heart.lost{opacity:.22}
+.life-count{font-family:var(--cm-font-mono);font-weight:800;font-size:1rem;color:var(--cm-cream);font-variant-numeric:tabular-nums}
+
+/* 4. Карточки башен: иконки в колонку, цены в одну линию справа */
+.tower-card>strong{justify-self:end;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tower-card .tower-copy{min-width:0}
+.tower-card .tower-copy b,.tower-card .tower-copy span{display:block;overflow:hidden;text-overflow:ellipsis}
+
+/* 5. Модалка/стекло: тень не режется скроллом */
+.modal-card::-webkit-scrollbar{width:6px}
+.modal-card::-webkit-scrollbar-thumb{background:rgba(238,241,247,.14);border-radius:999px}
+
+@media (prefers-reduced-motion:reduce){
+  .modal-card,.panel{scroll-behavior:auto}
+}
+
+/* =========================================================
+   VERSION 92 — меню-премиум + отчётливые «секретные» карточки
+   ========================================================= */
+
+/* ——— 1. Закрытые башни/усиления: волна видна сразу ——— */
+.tower-card .tower-mystery-icon{position:relative}
+.tower-card .tower-mystery-icon[data-wave]::after{
+  content:attr(data-wave);
+  position:absolute;top:-7px;right:-10px;min-width:18px;padding:2px 5px;
+  border-radius:999px;background:var(--cm-coral);color:var(--cm-soft);
+  font:800 9.5px/1.15 var(--cm-font-mono);letter-spacing:0;text-align:center;
+}
+.tower-card .tower-unlock{
+  display:inline-block!important;width:max-content;max-width:100%;
+  margin-top:4px;padding:1px 8px;border-radius:999px;
+  border:1px solid rgba(223,106,95,.34);background:rgba(223,106,95,.11);
+  color:var(--cm-coral)!important;
+  font:800 .62rem/1.7 var(--cm-font-mono);letter-spacing:.08em;
+  text-transform:uppercase;opacity:1!important;
+}
+.tower-card.mystery .tower-desc{color:rgba(238,241,247,.62)!important}
+
+/* ——— 2. Главное меню: hero-колонка ——— */
+.menu-card{
+  position:relative;
+  width:min(720px,100%);
+  padding:clamp(28px,5vw,46px) clamp(22px,5.5vw,54px) clamp(24px,4vw,40px)!important;
+  border-radius:28px!important;
+}
+/* композиция v90 сохранена: span — крупный serif-титр, strong — маленькая
+   моно-надпись под ним; центрируем и подсвечиваем янтарём подножие */
+.menu-logo{display:grid;justify-items:center;gap:8px;text-align:center;margin-top:6px}
+.menu-logo strong{
+  letter-spacing:.34em!important;text-indent:.34em;
+  color:var(--cm-amber)!important;
+  font-size:clamp(.78rem,1.5vw,.96rem)!important;
+}
+.menu-subtitle{
+  text-align:center;margin:10px auto 26px;max-width:46ch;
+  font-size:.88rem;color:var(--cm-muted);
+}
+
+/* ——— 3. Секции: заголовки-линии ——— */
+.menu-section{margin-top:10px}
+.menu-section h2{
+  display:flex;align-items:center;gap:12px;
+  margin:22px 0 12px;
+  font:800 .68rem/1 var(--cm-font-mono);
+  letter-spacing:.22em;text-transform:uppercase;
+  color:var(--cm-muted);
+}
+.menu-section h2::after{content:"";flex:1;height:1px;background:var(--cm-line)}
+.menu-map-head{margin-bottom:12px}
+.menu-map-head h2{margin:0}
+
+/* ——— 4. Карточки сложности: чище и спокойнее ——— */
+.difficulty-card{
+  min-height:0;padding:16px 14px!important;
+  border-width:1px!important;border-radius:16px!important;
+  border-color:var(--cm-line)!important;
+  background:linear-gradient(160deg,#191e30,#10141f)!important;
+  transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.difficulty-card>span:last-child{gap:3px!important}
+.difficulty-card b{font-size:.95rem;letter-spacing:0;text-transform:none;font-family:var(--cm-font-body)}
+.difficulty-card small{font-size:.7rem;line-height:1.35;color:rgba(238,241,247,.5)!important}
+.difficulty-icon{
+  width:50px!important;height:50px!important;border-radius:14px!important;
+  border-width:1px!important;border-color:var(--cm-line)!important;
+  background:#0d1018!important;color:var(--cm-cream)!important;
+  font-family:var(--cm-font-display)!important;font-size:1.05rem!important;font-weight:700!important;
+  letter-spacing:.06em;transition:border-color .16s ease,color .16s ease,background .16s ease;
+}
+.difficulty-card:hover:not(.active){
+  transform:translateY(-2px);border-color:rgba(238,241,247,.26)!important;
+  box-shadow:0 10px 24px rgba(5,7,13,.5)!important;
+}
+.difficulty-card.active{
+  border-color:rgba(238,199,106,.66)!important;
+  background:linear-gradient(160deg,#212a44,#151a2b)!important;
+  box-shadow:0 10px 26px rgba(5,7,13,.55)!important;
+}
+.difficulty-card.active .difficulty-icon{
+  border-color:rgba(238,199,106,.75)!important;
+  background:rgba(238,199,106,.12)!important;color:var(--cm-lime)!important;
+}
+
+/* ——— 5. Карточки карт ——— */
+.map-card{
+  border-radius:16px!important;border-color:var(--cm-line)!important;
+  background:#0d1018!important;padding:9px!important;
+}
+.map-card b{font-family:var(--cm-font-body);font-size:.86rem;letter-spacing:0;text-transform:none;color:var(--cm-cream)}
+.map-card small{color:rgba(238,241,247,.5)}
+.map-card:hover:not(:disabled){
+  transform:translateY(-2px);border-color:rgba(238,241,247,.26)!important;
+  box-shadow:0 10px 24px rgba(5,7,13,.5)!important;
+}
+.map-card.active{
+  border-color:rgba(238,199,106,.6)!important;
+  box-shadow:0 0 0 1px rgba(238,199,106,.32),0 10px 26px rgba(5,7,13,.55)!important;
+}
+.map-preview{border-radius:12px!important;background-color:#151a2b!important}
+
+/* ——— 6. Главная кнопка и служебные ——— */
+.menu-start{
+  display:block;width:min(360px,100%);
+  margin:30px auto 0;min-height:58px;
+  font-size:1rem;letter-spacing:.18em;border-radius:16px;
+}
+.menu-start:hover{transform:translateY(-2px);filter:brightness(1.06);box-shadow:0 14px 34px rgba(5,7,13,.55)!important}
+.menu-start:active{transform:translateY(0);filter:brightness(.98)}
+#newGameBtn{display:block;width:min(360px,100%);margin:10px auto 0;min-height:44px;border-radius:13px}
+.menu-tip{margin-top:16px;text-align:center;font-size:.72rem;line-height:1.5}
+/* строки «Сложность:/Карта:» — простая центрированная строка (в original-81
+   strong был абсолютно-positioned в угол карточки — гасим) */
+.selected-difficulty,.selected-map{
+  position:relative;display:flex!important;align-items:center;justify-content:center;
+  gap:6px;margin:14px 0 0!important;padding:0!important;border-top:0!important;
+  font-size:.78rem;color:var(--cm-muted);
+}
+.selected-difficulty strong,.selected-map strong{
+  position:static!important;display:inline!important;
+  color:var(--cm-lime)!important;
+}
+
+/* ——— 7. Панель настроек в меню: аккуратный дропдаун ——— */
+.menu-settings-panel{border-radius:16px!important}
+.lang-btn{border-radius:999px!important;min-width:52px;transition:.14s ease}
+
+/* ——— 8. Магазин: внутренний скролл — иначе секретные карточки недостижимы ——— */
+.tower-panel-section{display:flex;flex-direction:column;min-height:0}
+.tower-list,.boost-list{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;padding-right:4px;
+}
+.tower-list::-webkit-scrollbar,.boost-list::-webkit-scrollbar{width:6px}
+.tower-list::-webkit-scrollbar-thumb,.boost-list::-webkit-scrollbar-thumb{background:rgba(238,241,247,.14);border-radius:999px;border:0}
+
+
+

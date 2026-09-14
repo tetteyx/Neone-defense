@@ -3,228 +3,233 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Neon Bridge Defense</title>
+    <title>Bridge Guardians — защита последнего моста</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="main-menu" id="mainMenu">
       <div class="menu-card">
         <div class="menu-logo">
-          <span>NEON</span>
-          <strong>BRIDGE DEFENSE</strong>
+          <span>BRIDGE</span>
+          <strong>GUARDIANS</strong>
         </div>
-        <p class="menu-subtitle">Бесконечная защита жизни в неоновом мире</p>
+        <p class="menu-subtitle" data-i18n="ui.subtitle">Бесконечная защита последнего моста</p>
 
-        <button id="menuSettingsBtn" class="menu-settings-btn" type="button" aria-expanded="false" aria-controls="menuSettingsPanel" title="Настройки">⚙</button>
+        <button id="menuSettingsBtn" class="menu-settings-btn" type="button" aria-expanded="false" aria-controls="menuSettingsPanel" title="Настройки" data-i18n-title="ui.settings">⚙</button>
         <div id="menuSettingsPanel" class="menu-settings-panel hidden">
-          <h3>Настройки</h3>
+          <h3 data-i18n="ui.settings">Настройки</h3>
           <div class="menu-settings-row">
-            <label for="menuVolumeSlider">🔊 Громкость</label>
+            <label for="menuVolumeSlider" data-i18n="ui.volume">🔊 Громкость</label>
             <span id="menuVolumeValue">55%</span>
           </div>
           <div class="menu-settings-row">
-            <input id="menuVolumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" />
+            <input id="menuVolumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" data-i18n-aria="ui.volumeAria" />
           </div>
-          <button id="menuFullscreenBtn" type="button">⛶ Весь экран</button>
+          <div class="menu-settings-row menu-lang-row">
+            <span data-i18n="ui.langLabel">Язык</span>
+            <span class="lang-switch" role="group">
+              <button id="langRuBtn" class="lang-btn active" type="button">RU</button>
+              <button id="langEnBtn" class="lang-btn" type="button">EN</button>
+            </span>
+          </div>
+          <button id="menuFullscreenBtn" type="button" data-i18n="ui.fullscreen">⛶ Весь экран</button>
         </div>
 
         <div class="menu-section">
-          <h2>Выберите сложность</h2>
+          <h2 data-i18n="ui.difficultyTitle">Выберите сложность</h2>
           <div class="difficulty-list" id="difficultyList">
             <button class="difficulty-card active" data-difficulty="easy">
               <span class="difficulty-icon">I</span>
-              <span><b>Легкий</b><small>Мобы слабее, больше награды</small></span>
+              <span><b data-i18n="data.diff.easy.name">Легкий</b><small data-i18n="data.diff.easy.desc">Мобы слабее, больше награды</small></span>
             </button>
             <button class="difficulty-card" data-difficulty="normal">
               <span class="difficulty-icon">II</span>
-              <span><b>Средний</b><small>Сбалансированный режим</small></span>
+              <span><b data-i18n="data.diff.normal.name">Средний</b><small data-i18n="data.diff.normal.desc">Сбалансированный режим</small></span>
             </button>
             <button class="difficulty-card" data-difficulty="hard">
               <span class="difficulty-icon">III</span>
-              <span><b>Сложный</b><small>Мобы сильнее, меньше награды</small></span>
+              <span><b data-i18n="data.diff.hard.name">Сложный</b><small data-i18n="data.diff.hard.desc">Мобы сильнее, меньше награды</small></span>
             </button>
           </div>
-          <p class="selected-difficulty">Сложность: <strong id="selectedDifficultyName">Легкий</strong></p>
+          <p class="selected-difficulty"><span data-i18n="ui.difficultyLabel">Сложность:</span> <strong id="selectedDifficultyName">Легкий</strong></p>
         </div>
 
         <div class="menu-section">
-          <h2>Выберите карту</h2>
-          <div class="map-list" id="mapList">
-            <button class="map-card active" data-map="ridge">
-              <span class="map-preview ridge-preview"></span>
-              <span><b>Неоновый мост</b><small>Базовый маршрут</small></span>
-            </button>
-            <button class="map-card" data-map="circuit">
-              <span class="map-preview circuit-preview"></span>
-              <span><b>Кибер-контур</b><small>Много поворотов</small></span>
-            </button>
-            <button class="map-card" data-map="coreline">
-              <span class="map-preview coreline-preview"></span>
-              <span><b>Жизненная линия</b><small>Открытая трасса</small></span>
-            </button>
+          <div class="menu-map-head">
+            <h2 data-i18n="ui.mapTitle">Выберите карту</h2>
+            <button id="openEditorBtn" class="menu-editor-btn" type="button" title="Построить свою дорогу" data-i18n-title="ui.editorBtnTitle" data-i18n="ui.editorBtn">✎ Редактор карт</button>
           </div>
-          <p class="selected-map">Карта: <strong id="selectedMapName">Неоновый мост</strong></p>
+          <div class="map-list" id="mapList"><!-- Карточки генерирует renderMapCards() по данным maps --></div>
+          <p class="selected-map"><span data-i18n="ui.mapLabel">Карта:</span> <strong id="selectedMapName">Первый мост</strong></p>
         </div>
 
-        <button id="startGameBtn" class="menu-start primary">Новая игра</button>
+        <button id="startGameBtn" class="menu-start primary" data-i18n="ui.newGame">Новая игра</button>
         <button id="devInfiniteMoneyBtn" class="dev-money-btn" type="button" aria-pressed="false">DEV: ∞ GOLD — ВЫКЛ</button>
-        <button id="newGameBtn" class="menu-new hidden">Новая игра</button>
-        <p class="menu-tip">Совет: нажмите на выбранную башню справа ещё раз, чтобы снять её выбор.</p>
+        <button id="newGameBtn" class="menu-new hidden" data-i18n="ui.newGame">Новая игра</button>
+        <p class="menu-tip" data-i18n="ui.tip">Совет: нажмите на выбранную башню справа ещё раз, чтобы снять её выбор.</p>
       </div>
     </div>
 
     <div class="app hidden" id="gameScreen">
       <header class="topbar">
         <div>
-          <h1>Neon Bridge Defense</h1>
+          <h1>Bridge Guardians</h1>
         </div>
-        <div class="status-strip" aria-label="Статистика">
-          <div class="cash-status"><span id="money">$170</span><small>CASH</small></div>
-          <div class="lives-status" aria-label="Жизни"><div id="lives" class="heart-lives" aria-live="polite"></div><small>ЖИЗНИ</small></div>
-          <div class="wave-status"><div class="wave-stat"><small>WAVE</small><span id="wave">0 ∞</span></div><div class="wave-stat"><small>KILLS</small><span id="kills">0</span></div></div>
+        <div class="status-strip" aria-label="Статистика" data-i18n-aria="ui.statsAria">
+          <div class="cash-status"><span id="money">$300</span><small>CASH</small></div>
+          <div class="lives-status" aria-label="Жизни" data-i18n-aria="ui.livesAria"><div id="lives" class="heart-lives" aria-live="polite"></div><small data-i18n="ui.lives">ЖИЗНИ</small></div>
+          <div class="wave-status"><div class="wave-stat"><small data-i18n="ui.waveShort">ВОЛНА</small><span id="wave">0</span></div><div class="wave-stat"><small data-i18n="ui.kills">УБИЙСТВА</small><span id="kills">0</span></div></div>
         </div>
       </header>
 
       <main class="game-layout">
-        <section class="arena-wrap" aria-label="Игровое поле">
+        <section class="arena-wrap" aria-label="Игровое поле" data-i18n-aria="ui.arenaAria">
           <canvas id="game" width="1000" height="640"></canvas>
           <div class="hint-bar" id="hint">
             Выберите башню справа, затем поставьте её вне дороги.
           </div>
         </section>
 
-        <aside class="panel" aria-label="Управление">
+        <aside class="panel" aria-label="Управление" data-i18n-aria="ui.panelAria">
           <section class="panel-section tower-panel-section">
-            <div class="panel-switch" role="tablist" aria-label="Категория объектов">
-              <button id="towersTab" class="panel-switch-btn active" type="button" role="tab" aria-selected="true">Башни</button>
-              <button id="boostsTab" class="panel-switch-btn" type="button" role="tab" aria-selected="false">Усиления</button>
+            <div class="panel-switch" role="tablist" aria-label="Категория объектов" data-i18n-aria="ui.categoryAria">
+              <button id="towersTab" class="panel-switch-btn active" type="button" role="tab" aria-selected="true" data-i18n="ui.towers">Башни</button>
+              <button id="boostsTab" class="panel-switch-btn" type="button" role="tab" aria-selected="false" data-i18n="ui.boosts">Усиления</button>
             </div>
             <div class="tower-list" id="towerList">
 <button class="tower-card active" data-tower="pulse">
                 <svg class="tower-icon pulse" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 7v8M20 25v8M7 20h8M25 20h8" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>
-                <span class="tower-copy"><b>Импульс</b><span>быстро стреляет</span></span>
-                <strong><span class="cash-price">$55</span></strong>
+                <span class="tower-copy"><b data-i18n="data.tower.pulse.name">Импульс</b><span data-i18n="data.tower.pulse.desc">быстро стреляет</span></span>
+                <strong><span class="cash-price">$100</span></strong>
               </button>
               <button class="tower-card" data-tower="rail">
                 <svg class="tower-icon rail" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M8 29 29 8M13 32 32 13M10 20h10M20 10v10" /><circle class="icon-fill" cx="29" cy="8" r="3" /></svg>
-                <span class="tower-copy"><b>Рельсотрон</b><span>дальняя дистанция</span></span>
-                <strong><span class="cash-price">$85</span></strong>
+                <span class="tower-copy"><b data-i18n="data.tower.rail.name">Рельсотрон</b><span data-i18n="data.tower.rail.desc">дальняя дистанция</span></span>
+                <strong><span class="cash-price">$250</span></strong>
               </button>
               <button class="tower-card" data-tower="frost">
                 <svg class="tower-icon frost" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><path class="icon-stroke" d="M20 5v30M5 20h30M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>
-                <span class="tower-copy"><b>Криоузел</b><span>замедляет врагов</span></span>
-                <strong><span class="cash-price">$75</span></strong>
+                <span class="tower-copy"><b data-i18n="data.tower.frost.name">Криоузел</b><span data-i18n="data.tower.frost.desc">замедляет, яд усиливается с уроном</span></span>
+                <strong><span class="cash-price">$150</span></strong>
               </button>
               <button class="tower-card" data-tower="blast">
                 <svg class="tower-icon blast" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><path class="icon-stroke" d="M20 5v7M20 28v7M5 20h7M28 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
-                <span class="tower-copy"><b>Разлом</b><span>урон по области</span></span>
-                <strong><span class="cash-price">$110</span></strong>
+                <span class="tower-copy"><b data-i18n="data.tower.blast.name">Разлом</b><span data-i18n="data.tower.blast.desc">урон по области</span></span>
+                <strong><span class="cash-price">$175</span></strong>
               </button>
               <button class="tower-card" data-tower="arc">
                 <svg class="tower-icon arc" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><path class="icon-stroke" d="M7 27c5-7 9-7 13 0 4 7 8 7 13 0M11 13c4-5 8-5 12 0 3 4 5 4 7 1" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg>
-                <span class="tower-copy"><b>Дуга</b><span>цепная молния</span></span>
-                <strong><span class="cash-price">$140</span></strong>
+                <span class="tower-copy"><b data-i18n="data.tower.arc.name">Дуга</b><span data-i18n="data.tower.arc.desc">связывается в лазерную цепь</span></span>
+                <strong><span class="cash-price">$125</span></strong>
+              </button>
+              <button class="tower-card locked mystery" data-tower="devastator" aria-disabled="true">
+                <span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <svg class="tower-icon devastator" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="9" /><path class="icon-stroke" d="M20 4v9M20 27v9M4 20h9M27 20h9M8 8l7 7M25 25l7 7M32 8l-7 7M15 25l-7 7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="огромный урон одной цели">Открывается за 1300 убийств</span><span class="tower-unlock"></span></span>
+                <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="titan" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon titan" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M7 12h10M23 12h10M7 28h10M23 28h10M10 8v7M30 8v7M10 25v7M30 25v7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="мощный удар с уроном по области">Открывается с 20-й волны</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="поглощает урон соседей-лазеров">Открывается за 1400 убийств</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="nova" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon nova" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v8M20 28v8M4 20h8M28 20h8M9 9l6 6M25 25l6 6M31 9l-6 6M15 25l-6 6" /><circle class="icon-fill" cx="20" cy="20" r="5" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="сильный взрыв с большим радиусом">Открывается с 40-й волны</span><span class="tower-unlock"></span></span>
-                <strong><span class="cash-price">???</span></strong>
-              </button>
-              <button class="tower-card locked mystery" data-tower="devastator" aria-disabled="true">
-                <span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <svg class="tower-icon devastator" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="9" /><path class="icon-stroke" d="M20 4v9M20 27v9M4 20h9M27 20h9M8 8l7 7M25 25l7 7M32 8l-7 7M15 25l-7 7" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="тяжёлый урон по большой области">Открывается с 70-й волны</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="пробивает строй насквозь">Открывается за 1500 убийств</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card locked mystery" data-tower="singularity" aria-disabled="true">
                 <span class="tower-mystery-icon" aria-hidden="true">?</span>
                 <svg class="tower-icon singularity" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="10" /><circle class="icon-stroke" cx="20" cy="20" r="6" /><circle class="icon-fill" cx="20" cy="20" r="2.8" /></svg>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="ультимативная башня с колоссальным уроном">Открывается с 100-й волны</span><span class="tower-unlock"></span></span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="копирует мощь прокачанных соседей">Открывается за 1600 убийств</span><span class="tower-unlock"></span></span>
                 <strong><span class="cash-price">???</span></strong>
               </button>
             </div>
             <div class="boost-list hidden" id="boostList">
-              <button class="tower-card support-card locked mystery" data-tower="booster" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v7M20 29v7M4 20h7M29 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+15% урон · +10 радиус · +8% скорость">Открывается с 30-й волны</span><span class="tower-unlock"></span></span>
-                <strong><span class="cash-price">???</span></strong>
-              </button>
-              <button class="tower-card support-card locked mystery" data-tower="overcharger" aria-disabled="true">
-                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 5v30M5 20h30" /><path class="icon-stroke" d="m13 13 5 5-5 5M27 13l-5 5 5 5" /><circle class="icon-fill" cx="20" cy="20" r="3.5" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+18% скорость · +5% урон">Открывается с 90-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
-              </button>
               <button class="tower-card support-card locked mystery" data-tower="range_amp" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><circle class="icon-stroke" cx="20" cy="20" r="7" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+35 радиус · +8% урон">Открывается с 120-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% радиус">Открывается за 300 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="booster" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v7M20 29v7M4 20h7M29 20h7M9 9l5 5M26 26l5 5M31 9l-5 5M14 26l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+40% урон">Открывается за 450 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="rate_xchg" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 5v30M5 20h30" /><path class="icon-stroke" d="m13 13 5 5-5 5M27 13l-5 5 5 5" /><circle class="icon-fill" cx="20" cy="20" r="3.5" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+60% скорость, −40% урон, −10% радиус">Открывается за 600 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="range_xchg" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="12" /><path class="icon-stroke" d="M8 20h9m-4-4 4 4-4 4M23 20h9m-4-4 4 4-4 4" /><circle class="icon-fill" cx="20" cy="20" r="2.6" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100 радиус, −25% скорость">Открывается за 750 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+              </button>
+              <button class="tower-card support-card locked mystery" data-tower="overcharger" aria-disabled="true">
+                <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M18 5 9 22h7l-3 13 14-20h-8l4-10z" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+120% скорость">Открывается за 900 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="reactor" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="8" /><path class="icon-stroke" d="M20 4v10M20 26v10M4 20h10M26 20h10" /><path class="icon-stroke" d="m12 12 5 5M23 23l5 5M28 12l-5 5M17 23l-5 5" /><circle class="icon-fill" cx="20" cy="20" r="4" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+15% урон · +12% скорость">Открывается с 200-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% урон">Открывается за 1000 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <button class="tower-card support-card locked mystery" data-tower="nexus" aria-disabled="true">
                 <svg class="tower-icon booster" viewBox="0 0 40 40" aria-hidden="true"><circle class="icon-bg" cx="20" cy="20" r="15" /><circle class="icon-stroke" cx="20" cy="20" r="10" /><path class="icon-stroke" d="M20 4v32M4 20h32M9 9l22 22M31 9 9 31" /><circle class="icon-fill" cx="20" cy="20" r="3" /></svg><span class="tower-mystery-icon" aria-hidden="true">?</span>
-                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+20% урон · +25 радиус · +10% скорость">Открывается с 400-й волны</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
+                <span class="tower-copy"><b class="tower-name">???</b><span class="tower-desc" data-default-text="+100% урон, −30% радиус и скорость">Открывается за 1100 убийств</span><span class="tower-unlock"></span></span><strong><span class="cash-price">???</span></strong>
               </button>
               <div class="boost-info">
-                <strong>Модули поддержки</strong>
-                <span>Новые усиления открываются по мере прохождения волн и складываются в зоне действия.</span>
+                <strong data-i18n="ui.boostInfoTitle">Модули поддержки</strong>
+                <span data-i18n="ui.boostInfoText">Модификаторы открываются за общее число убийств и складываются в зоне действия.</span>
               </div>
             </div>
           </section>
 
           <section class="panel-section wave-control-section">
-            <h2>Бесконечные волны</h2>
+            <h2 data-i18n="ui.wavesTitle">Бесконечные волны</h2>
             <div class="wave-card">
               <div>
-                <span id="waveName">Автоволны</span>
-                <small id="enemyCount">Первая волна начнётся автоматически</small>
+                <span id="waveName" data-i18n="ui.autoWaves">Автоволны</span>
+                <small id="enemyCount" data-i18n="ui.firstWave">Первая волна начнётся автоматически</small>
               </div>
               <span class="auto-wave-badge">AUTO</span>
             </div>
             <div class="control-row">
-              <button id="nextWaveBtn" class="primary">Запустить волну</button>
-              <button id="pauseBtn">Пауза</button>
+              <button id="nextWaveBtn" class="primary" data-i18n="ui.startWave">Запустить волну</button>
+              <button id="pauseBtn" data-i18n="ui.pause">Пауза</button>
               <button id="speedBtn">x1</button>
             </div>
             <div class="wave-bottom-actions">
-              <div class="settings-widget" id="settingsWidget" aria-label="Настройки игры">
-                <button id="settingsBtn" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settingsPanel" title="Настройки">⚙ Настройки</button>
+              <div class="settings-widget" id="settingsWidget" aria-label="Настройки игры" data-i18n-aria="ui.gameSettingsAria">
+                <button id="settingsBtn" class="settings-toggle" type="button" aria-expanded="false" aria-controls="settingsPanel" title="Настройки" data-i18n-title="ui.settings" data-i18n="ui.settingsBtn">⚙ Настройки</button>
                 <div class="settings-panel hidden" id="settingsPanel">
-                  <button id="fullscreenBtn" class="floating-fullscreen" type="button">⛶ Весь экран</button>
+                  <button id="fullscreenBtn" class="floating-fullscreen" type="button" data-i18n="ui.fullscreen">⛶ Весь экран</button>
                   <div class="floating-volume">
                     <div class="volume-head">
-                      <label for="volumeSlider">🔊 Громкость</label>
+                      <label for="volumeSlider" data-i18n="ui.volume">🔊 Громкость</label>
                       <span id="volumeValue">55%</span>
                     </div>
-                    <input id="volumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" />
+                    <input id="volumeSlider" type="range" min="0" max="100" value="55" step="1" aria-label="Громкость игры" data-i18n-aria="ui.volumeAria" />
                   </div>
                 </div>
               </div>
-              <button id="menuBtn" class="menu-back">← Главное меню</button>
+              <button id="adRewardBtn" class="ad-reward-btn" type="button">📺 Реклама: +$250</button>
+              <button id="menuBtn" class="menu-back" data-i18n="ui.mainMenu">← Главное меню</button>
             </div>
           </section>
 
           <section class="panel-section selected-box selected-section">
-            <h2>Прокачка</h2>
+            <h2 data-i18n="ui.levelUpTitle">Прокачка</h2>
             <div id="selectionInfo" class="selection-info">
               <div class="selection-title-row">
-                <strong>Башня не выбрана</strong>
+                <strong data-i18n="ui.towerNotSelected">Башня не выбрана</strong>
                 <span class="selection-cost">—</span>
               </div>
-              <p>Выберите башню справа для установки.</p>
+              <p data-i18n="ui.pickTower">Выберите башню справа для установки.</p>
             </div>
             <div class="action-grid upgrade-grid">
-              <button id="upgradeBtn" class="upgrade-damage" disabled>Урон +</button>
-              <button id="rangeBtn" class="upgrade-range" disabled>Радиус +</button>
-              <button id="speedBtnUpgrade" class="upgrade-speed" disabled>Скорость +</button>
-              <button id="sellBtn" disabled>Продать</button>
+              <button id="upgradeBtn" class="upgrade-damage" disabled data-i18n="ui.upgDamage">Урон +</button>
+              <button id="rangeBtn" class="upgrade-range" disabled data-i18n="ui.upgRange">Радиус +</button>
+              <button id="speedBtnUpgrade" class="upgrade-speed" disabled data-i18n="ui.upgSpeed">Скорость +</button>
+              <button id="sellBtn" disabled data-i18n="ui.sell">Продать</button>
             </div>
           </section>
         </aside>
@@ -232,20 +237,20 @@
       <div class="pause-overlay hidden" id="pauseOverlay" aria-live="polite">
         <div class="pause-card">
           <div class="pause-icon">Ⅱ</div>
-          <h2>Пауза</h2>
-          <p>Симуляция остановлена</p>
-          <button id="resumeBtn" class="primary">Продолжить</button>
+          <h2 data-i18n="pause.title">Пауза</h2>
+          <p data-i18n="pause.text">Симуляция остановлена</p>
+          <button id="resumeBtn" class="primary" data-i18n="ui.resume">Продолжить</button>
         </div>
       </div>
     </div>
 
     <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
       <div class="modal-card">
-        <h2 id="endTitle">Игра окончена</h2>
+        <h2 id="endTitle" data-i18n="end.gameoverTitle">Игра окончена</h2>
         <p id="endText">Жизни закончились.</p>
         <div class="modal-actions">
-          <button id="restartBtn" class="primary">Начать заново</button>
-          <button id="endMenuBtn" class="menu-back">Выйти в меню</button>
+          <button id="restartBtn" class="primary" data-i18n="end.restart">Начать заново</button>
+          <button id="endMenuBtn" class="menu-back" data-i18n="end.toMenu">Выйти в меню</button>
         </div>
       </div>
     </div>
@@ -304,6 +309,7 @@
         syncVolume();
       })();
     </script>
+    <script src="i18n.js"></script>
     <script src="combo-ui.js"></script>
     <script src="game.js"></script>
   </body>

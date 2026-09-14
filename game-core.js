@@ -48,6 +48,57 @@ const selectedMapNameEl = document.getElementById("selectedMapName");
 const difficultyList = document.getElementById("difficultyList");
 const selectedDifficultyNameEl = document.getElementById("selectedDifficultyName");
 const devInfiniteMoneyBtn = document.getElementById("devInfiniteMoneyBtn");
+const adRewardBtn = document.getElementById("adRewardBtn");
+
+/* ---- Локализация (i18n.js, требование 2.14 Яндекс.Игр) ------------------
+   tl() — быстрый перевод строки по ключу; при отсутствии i18n.js возвращает
+   ключ, поэтому игра не ломается. applyDataI18n() подставляет имена и
+   описания башен/комбо/карт/сложностей из словаря текущего языка. */
+const tl = (key, params) =>
+  (window.NeonI18N && typeof window.NeonI18N.t === "function")
+    ? window.NeonI18N.t(key, params)
+    : key;
+
+function applyDataI18n() {
+  const N = window.NeonI18N;
+  if (!N || typeof N.has !== "function") return;
+
+  const override = (obj, field, key) => {
+    if (obj && N.has(key)) obj[field] = N.t(key);
+  };
+
+  for (const id in towerTypes) {
+    const tw = towerTypes[id];
+    override(tw, "name", "data.tower." + id + ".name");
+    override(tw, "description", "data.tower." + id + ".desc");
+    if (tw.combo) {
+      override(tw.combo, "name", "data.combo." + id + ".name");
+      override(tw.combo, "description", "data.combo." + id + ".desc");
+    }
+  }
+
+  for (const id of ["ridge", "circuit", "coreline"]) {
+    override(maps[id], "name", "data.map." + id + ".name");
+    override(maps[id], "description", "data.map." + id + ".desc");
+  }
+
+  for (const id in difficulties) {
+    override(difficulties[id], "name", "data.diff." + id + ".name");
+  }
+}
+
+if (window.NeonI18N && typeof window.NeonI18N.onChange === "function") {
+  window.NeonI18N.onChange(() => {
+    applyDataI18n();
+    try { renderMapCards(); } catch (e) {}
+    try { updateTowerAvailability(); } catch (e) {}
+    try { updateUi(); } catch (e) {}
+    try { updateResumeButton(); } catch (e) {}
+    try {
+      if (typeof refreshAdRewardLabel === "function") refreshAdRewardLabel();
+    } catch (e) {}
+  });
+}
 
 /* =========================================================
    САУНД-ДИЗАЙН
@@ -216,7 +267,7 @@ canvas.height = GAME_HEIGHT;
 const MAX_UPGRADE_LEVEL = 8;
 const SPEED_OVERDRIVE_CHANCE = 0.25;
 const SPEED_OVERDRIVE_INTERVAL = 5;
-const SPEED_OVERDRIVE_DURATION = 10;
+const SPEED_OVERDRIVE_DURATION = 5;
 const SPEED_OVERDRIVE_SHAKE_DURATION = SPEED_OVERDRIVE_DURATION;
 const COMBO_RADIUS = 92;
 const COMBO_CHECK_INTERVAL = 5;
@@ -227,148 +278,242 @@ const COMBO_CHECK_INTERVAL = 5;
 let DEV_INFINITE_MONEY = false;
 const TEST_MONEY = 999999999;
 
+/* =========================================================
+    БАЛАНС — полностью перенесён из Onslaught 2.2 (slipcor/gaby):
+    базовые таблицы урона/дальности/скорострельности и цены апгрейдов —
+    из официального FAQ (Noober/Oxy, playr.co.uk, 2007–2009, версии 2.1x–2.2),
+    механика модерификаторов — со справочных страниц игры.
+
+    Структура типа:
+      dmgTiers/rngTiers/rateTiers — значения по уровням 1..N (level > N — максимум);
+      upgDmg/upgRng/upgRate       — стоимость каждого следующего уровня;
+      rateTiers — очки скорострельности (ROF points), интервал = rofK / pts;
+      unlockKills                 — отпирать по НАКОПЛЕННЫМ УБИЙСТВАМ (как в оригинале),
+                                    а не по номеру волны.
+    Адаптированные (в оригинале не документированы поминутно): rail, цены
+    апгрейдов продвинутых турелей, награды за фраги (0.5×HP волны), стартовые
+    деньги ($300). Всё остальное — дословные числа Onslaught 2.2.
+========================================================= */
 const towerTypes = {
   booster: {
-    name: "Усилитель", cost: 500, unlockWave: 30, damage: 0, range: 145, fireRate: 999, color: "#72f2a2",
-    description: "+15% урон · +10 радиус · +8% скорость",
-    support: { damage: 0.15, range: 10, speed: 0.08 }
+    name: "Усилитель", cost: 5000, unlockKills: 450, damage: 0, range: 145, fireRate: 999, color: "#74c476",
+    description: "+40% урон (Damage+, 450 уб.)",
+    support: { dmgPct: 0.40 }
   },
   overcharger: {
-    name: "Разгонщик", cost: 2200, unlockWave: 90, damage: 0, range: 120, fireRate: 999, color: "#59a9ff",
-    description: "+18% скорость · +5% урон",
-    support: { damage: 0.05, range: 0, speed: 0.18 }
+    name: "Разгонщик", cost: 3000, unlockKills: 900, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
+    description: "+120% скорость (Rate+, 900 уб.)",
+    support: { ratePct: 1.20 }
   },
   range_amp: {
-    name: "Дальний модуль", cost: 6500, unlockWave: 120, damage: 0, range: 175, fireRate: 999, color: "#bd7cff",
-    description: "+35 радиус · +8% урон",
-    support: { damage: 0.08, range: 35, speed: 0 }
+    name: "Дальний модуль", cost: 2000, unlockKills: 300, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
+    description: "+100% радиус (Range+, 300 уб.)",
+    support: { rngPct: 1.00 }
   },
   reactor: {
-    name: "Реактор", cost: 18000, unlockWave: 200, damage: 0, range: 155, fireRate: 999, color: "#ffe66d",
-    description: "+15% урон · +12% скорость",
-    support: { damage: 0.15, range: 0, speed: 0.12 }
+    name: "Реактор", cost: 8500, unlockKills: 1000, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
+    description: "+100% урон (Damage++, 1000 уб.)",
+    support: { dmgPct: 1.00 }
   },
   nexus: {
-    name: "Нексус", cost: 60000, unlockWave: 400, damage: 0, range: 210, fireRate: 999, color: "#ff4dff",
-    description: "+20% урон · +25 радиус · +10% скорость",
-    support: { damage: 0.20, range: 25, speed: 0.10 }
+    name: "Нексус", cost: 3500, unlockKills: 1100, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
+    description: "+100% урон, −30% радиус и скорость (Big Dmg Exch., 1100 уб.)",
+    support: { dmgPct: 1.00, rngPct: -0.30, ratePct: -0.30 }
+  },
+  rate_xchg: {
+    name: "Частотник", cost: 1200, unlockKills: 600, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
+    description: "+60% скорость, −40% урон, −10% радиус (Rate Exch., 600 уб.)",
+    support: { ratePct: 0.60, dmgPct: -0.40, rngPct: -0.10 }
+  },
+  range_xchg: {
+    name: "Ретранслятор", cost: 1000, unlockKills: 750, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
+    description: "+100 радиус, −25% скорость (Range Exch., 750 уб.)",
+    support: { rngFlat: 100, ratePct: -0.25 }
   },
 
+  // ── БАЗА: Cannon(син.) / Laser(зел.) / Rocket(кр.) / Tazer(жёлт.) + наш рейл ──
   pulse: {
     name: "Импульс",
-    cost: 55,
-    damage: 18,
-    range: 125,
-    fireRate: 0.45,
-    color: "#63e6ff",
+    cost: 100,
+    color: "#74c476",
     projectileSpeed: 500,
+    rofK: 45,
+    // Onslaught Cannon (Blue): урон 15→46000, 10 уровней.
+    dmgTiers: [15, 30, 60, 150, 400, 1200, 3100, 8500, 18400, 46000],
+    rngTiers: [130, 140, 150, 165, 180, 220],
+    rateTiers: [100, 110, 125, 140, 160, 180, 200, 240],
+    upgDmg: [20, 50, 100, 250, 600, 1000, 1100, 1200, 1500],
+    upgRng: [30, 100, 200, 500, 950],
+    upgRate: [50, 150, 300, 450, 950, 1000, 1450],
+    freakout: true,          // «Freak Out» оригинала: ×4 темп, ×3 урон, ~5 c
+    damage: 15, range: 130, fireRate: 0.45,
+    description: "скорострельная, короткая дистанция",
     combo: { chance: 0.40, cooldown: 5, name: "Мины", description: "40% шанс каждые 5 секунд установить мину на дороге" }
   },
 
   rail: {
     name: "Рельсотрон",
-    cost: 85,
-    damage: 65,
-    range: 220,
-    fireRate: 1.5,
-    color: "#b88cff",
-    projectileSpeed: 800,
+    cost: 250,
+    color: "#5b9fd6",
+    projectileSpeed: 1200,
+    rofK: 78,
+    // Адаптация «раннего снайпера» (оригинальные снайперы открываются поздно).
+    dmgTiers: [200, 500, 1250, 3000, 7500, 18000],
+    rngTiers: [300, 330, 365, 400, 450],
+    rateTiers: [33, 35, 39, 42, 45, 50],
+    upgDmg: [60, 120, 240, 480, 960],
+    upgRng: [40, 100, 250, 500, 900],
+    upgRate: [70, 140, 280, 560, 1120],
+    damage: 200, range: 300, fireRate: 2.36,
+    description: "дальняя дистанция",
     combo: { chance: 0.35, cooldown: 5, name: "Пробой", description: "35% шанс каждые 5 секунд пробить несколько самых опасных врагов" }
   },
 
   frost: {
     name: "Криоузел",
-    cost: 75,
-    damage: 8,
-    range: 145,
-    fireRate: 0.75,
-    color: "#7fffd4",
+    cost: 150,
+    color: "#8fd0e8",
     projectileSpeed: 450,
+    rofK: 40,
+    // Onslaught Tazer (Yellow): яд-замедление, сила яда растёт с уроном.
+    dmgTiers: [50, 75, 125, 200, 800, 3500, 11000, 30000],
+    rngTiers: [65, 75, 85, 105, 130, 155],
+    rateTiers: [60, 70, 80, 90, 100, 120, 150, 180],
+    upgDmg: [40, 80, 190, 300, 600, 1000, 1100],
+    upgRng: [50, 100, 300, 600, 1000],
+    upgRate: [50, 100, 225, 390, 650, 1100, 1450],
+    freakout: true,          // у Tazer freakout ещё и усиливает яд
     slow: 0.45,
     slowTime: 1.5,
+    damage: 50, range: 65, fireRate: 0.67,
+    description: "замедляет врагов",
     combo: { chance: 0.45, cooldown: 5, name: "Крио-волна", description: "45% шанс каждые 5 секунд заморозить группу врагов" }
   },
 
   blast: {
     name: "Разлом",
-    cost: 110,
-    damage: 42,
-    range: 135,
-    fireRate: 1.3,
-    color: "#ff8b6b",
+    cost: 175,
+    color: "#df6a5f",
     projectileSpeed: 380,
+    rofK: 65,
+    // Onslaught Rocket (Red): самый сильный, дорогой в прокачке, Holding Pattern.
+    dmgTiers: [50, 120, 350, 800, 1950, 6050, 11500, 27000, 48900, 65000],
+    rngTiers: [190, 210, 220, 230, 250, 275, 300, 325, 350],
+    rateTiers: [50, 60, 70, 85, 100, 115, 135, 155, 180, 210],
+    upgDmg: [50, 100, 200, 350, 650, 1200, 1200, 1300, 1500, 1500],
+    upgRng: [35, 80, 160, 400, 900, 1100, 1300, 1500],
+    upgRate: [30, 60, 115, 200, 340, 600, 900, 1050, 1150],
+    holding: true,           // « Holding Pattern»: 3 апдейса дальности + 3 темпа
     splash: 55,
+    damage: 50, range: 190, fireRate: 1.3,
+    description: "урон по области",
     combo: { chance: 0.35, cooldown: 6, name: "Метеор", description: "35% шанс вызвать мощный взрыв на случайном участке дороги" }
   },
 
   arc: {
     name: "Дуга",
-    cost: 140,
-    damage: 32,
-    range: 165,
-    fireRate: 0.9,
-    color: "#ffe66d",
+    cost: 125,
+    color: "#e8b64c",
     projectileSpeed: 650,
-    chain: 2,
+    rofK: 54,
+    // Onslaught Laser (Green): дешевле всех в прокачке, линкуется в цепь.
+    dmgTiers: [25, 50, 120, 400, 1500, 3900, 9300, 19500, 35000],
+    rngTiers: [100, 110, 125, 140, 160, 180, 205, 230, 255, 285, 320],
+    rateTiers: [60, 65, 70, 80, 90, 105, 120, 135, 160, 190],
+    upgDmg: [20, 50, 125, 300, 700, 850, 950, 1000],
+    upgRng: [15, 25, 40, 65, 105, 170, 275, 445, 720, 1100],
+    upgRate: [30, 75, 180, 300, 450, 600, 800, 900, 1000],
+    laserChain: true,        // линк: (урон_цепи + урон соседа) × 1.25 за каждое звено
+    damage: 25, range: 100, fireRate: 0.9,
+    description: "связывается в лазерную цепь",
     combo: { chance: 0.35, cooldown: 6, name: "Цепная буря", description: "35% шанс поразить цепью до 6 врагов" }
   },
 
+  // ── ПРОДВИНУТЫЕ: Sniper / Fusion / Railgun / Combonly (цена и $ из FAQ) ──
   titan: {
     name: "Титан",
-    cost: 10000,
-    unlockWave: 20,
-    damage: 520,
-    range: 230,
-    fireRate: 1.05,
-    color: "#ff9f43",
+    cost: 12000,
+    unlockKills: 1400,
+    color: "#e08b52",
     projectileSpeed: 760,
+    rofK: 170,
+    // Onslaught Fusion: копит урон простаивающих лазеров/тейзеров рядом.
+    dmgTiers: [1000000, 3000000, 10000000, 35000000],
+    rngTiers: [210, 240],
+    rateTiers: [50, 55, 60, 66],
+    upgDmg: [1500, 3000, 6000, 12000],
+    upgRng: [800, 1600],
+    upgRate: [700, 1400, 2800],
+    fusion: true,
     splash: 42,
-    description: "урон по области",
+    damage: 1000000, range: 210, fireRate: 3.4,
+    description: "поглощает урон соседей-лазеров",
     combo: { chance: 0.30, cooldown: 7, name: "Орбитальный удар", description: "30% шанс обрушить удар на самую плотную группу" }
   },
 
   nova: {
     name: "Нова",
-    cost: 20000,
-    unlockWave: 40,
-    damage: 980,
-    range: 250,
-    fireRate: 1.25,
-    color: "#5ee7ff",
-    projectileSpeed: 820,
-    splash: 70,
-    description: "большой взрыв",
+    cost: 12000,
+    unlockKills: 1500,
+    color: "#eef1f7",
+    projectileSpeed: 1400,
+    rofK: 150,
+    // Onslaught Railgun: пробивает несколько врагов одним выстрелом.
+    dmgTiers: [4000000, 9000000, 15000000, 25000000],
+    rngTiers: [440, 480],
+    rateTiers: [60, 66, 72],
+    upgDmg: [1200, 2400, 4800, 9600],
+    upgRng: [900, 1800],
+    upgRate: [500, 1000, 2000],
+    pierce: true,
+    damage: 4000000, range: 440, fireRate: 2.5,
+    description: "пробивает строй насквозь",
     combo: { chance: 0.25, cooldown: 8, name: "Сверхновая", description: "25% шанс нанести урон всем врагам на дороге" }
   },
 
   devastator: {
     name: "Опустошитель",
-    cost: 50000,
-    unlockWave: 70,
-    damage: 3200,
-    range: 275,
-    fireRate: 1.65,
-    color: "#ff5577",
-    projectileSpeed: 900,
-    splash: 95,
-    description: "тяжёлый урон",
+    cost: 12000,
+    unlockKills: 1300,
+    color: "#c9504f",
+    projectileSpeed: 2400,
+    rofK: 168,
+    // Onslaught Sniper: 3M→55M по одной цели, медленный, огромный радиус.
+    dmgTiers: [3000000, 7000000, 15000000, 55000000],
+    rngTiers: [420],
+    rateTiers: [40, 44, 48, 52],
+    upgDmg: [1000, 2000, 4000, 8000],
+    upgRng: [],
+    upgRate: [600, 1200, 2400],
+    damage: 3000000, range: 420, fireRate: 4.2,
+    description: "огромный урон одной цели",
     combo: { chance: 0.20, cooldown: 9, name: "Аннигиляция", description: "20% шанс сильно ослабить всех врагов" }
   },
 
   singularity: {
     name: "Нуль-коллайдер",
-    cost: 100000,
-    unlockWave: 100,
-    damage: 25000,
-    range: 300,
-    fireRate: 4.5,
-    color: "#ff4dff",
+    cost: 5000,
+    unlockKills: 1600,
+    color: "#eec76a",
     projectileSpeed: 520,
+    rofK: 154,
+    // Onslaught Combonly: сила зависит от прокачанных в максимум соседей.
+    dmgTiers: [150000, 300000, 600000, 1200000],
+    rngTiers: [320, 360, 400],
+    rateTiers: [55, 60],
+    upgDmg: [800, 1600, 3200, 6400],
+    upgRng: [700, 1400, 2800],
+    upgRate: [900, 1800],
+    absorbs: true,           // +30% урона каждой «в максимум» базовой турели рядом
     splash: 105,
-    description: "огромный урон",
+    damage: 150000, range: 320, fireRate: 2.8,
+    description: "копирует мощь прокачанных соседей",
     combo: { chance: 0.15, cooldown: 10, name: "Сингулярность", description: "15% шанс создать чёрную дыру, разрушающую строй врагов" }
   }
 };
+
+const SUPPORT_TYPES = ["booster", "overcharger", "range_amp", "reactor", "nexus", "rate_xchg", "range_xchg"];
+const ADVANCED_TYPES = ["titan", "nova", "devastator", "singularity"];
 
 
 /* =========================================================
@@ -376,8 +521,8 @@ const towerTypes = {
 ========================================================= */
 
 const state = {
-  money: 170,
-  lives: 12,
+  money: 300,
+  lives: 10,
 
   wave: 0,
   maxWaves: Infinity,
@@ -423,7 +568,7 @@ const state = {
 
 const maps = {
   ridge: {
-    name: "Неоновый мост",
+    name: "Первый мост",
     description: "Базовый маршрут с длинными прямыми участками.",
     path: [
       { x: -40, y: 120 },
@@ -435,7 +580,7 @@ const maps = {
       { x: 560, y: 390 },
       { x: 790, y: 390 },
       { x: 790, y: 220 },
-      { x: 1040, y: 220 }
+      { x: 946, y: 220 }
     ]
   },
   circuit: {
@@ -451,7 +596,7 @@ const maps = {
       { x: 520, y: 180 },
       { x: 720, y: 180 },
       { x: 720, y: 500 },
-      { x: 1040, y: 500 }
+      { x: 946, y: 500 }
     ]
   },
   coreline: {
@@ -465,7 +610,7 @@ const maps = {
       { x: 430, y: 500 },
       { x: 680, y: 500 },
       { x: 680, y: 300 },
-      { x: 1040, y: 300 }
+      { x: 946, y: 300 }
     ]
   }
 };
@@ -473,6 +618,172 @@ const maps = {
 let currentMap = "ridge";
 let path = maps[currentMap].path;
 
+/* =========================================================
+   ПОЛЬЗОВАТЕЛЬСКИЕ КАРТЫ (редактор editor.html) и SVG-превью
+   Дороги в карточках меню рисуются по РЕАЛЬНОЙ геометрии
+   маршрута каждой карты.
+========================================================= */
+
+const CUSTOM_MAPS_KEY = "neonBridgeDefenseMaps_v1";
+const BUILTIN_MAP_IDS = Object.keys(maps);
+
+function escapeHtmlText(s) {
+  return String(s).replace(/[&<>"]/g, ch => (
+    ch === "&" ? "&amp;" : ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : "&quot;"
+  ));
+}
+
+function sanitizeCustomPath(rawPath) {
+  const out = [];
+  if (!Array.isArray(rawPath)) return out;
+  for (const p of rawPath) {
+    if (!p) continue;
+    const x = Number(p.x);
+    const y = Number(p.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    out.push({
+      x: Math.max(-60, Math.min(990, Math.round(x))),
+      y: Math.max(30, Math.min(610, Math.round(y)))
+    });
+  }
+  return out;
+}
+
+function readCustomMaps() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_MAPS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    const out = [];
+    for (const m of arr) {
+      const id = m && typeof m.id === "string" ? m.id.slice(0, 40) : "";
+      // Встроенные карты защищены от перезаписи пользовательскими.
+      if (!/^cm_[a-z0-9_-]+$/i.test(id) || BUILTIN_MAP_IDS.indexOf(id) >= 0) continue;
+      const cleanPath = sanitizeCustomPath(m.path);
+      if (cleanPath.length < 2) continue;
+      out.push({
+        id,
+        custom: true,
+        name: String(m.name || tl("editor.defaultName")).slice(0, 28),
+        description: String(m.description || tl("data.map.custom.desc")).slice(0, 60),
+        path: cleanPath
+      });
+      if (out.length >= 12) break;
+    }
+    return out;
+  } catch (error) {
+    return [];
+  }
+}
+
+function mergeCustomMaps() {
+  for (const m of readCustomMaps()) maps[m.id] = m;
+}
+
+function writeCustomMaps(list) {
+  try {
+    localStorage.setItem(CUSTOM_MAPS_KEY, JSON.stringify(list));
+  } catch (error) {
+    /* LocalStorage может быть недоступен. */
+  }
+}
+
+function deleteCustomMap(id) {
+  writeCustomMaps(readCustomMaps().filter(m => m.id !== id));
+  if (maps[id] && maps[id].custom) {
+    delete maps[id];
+    if (currentMap === id) {
+      currentMap = "ridge";
+      path = maps.ridge.path;
+      PATH_LENGTH = totalPathLength();
+    }
+  }
+  // «Могильная метка» удаления: не даёт карте вернуться из облака на других
+  // устройствах, и облако обновляется сразу.
+  try {
+    const KEY_DEL = "neonBridgeDefenseMapsDeleted_v1";
+    const tomb = JSON.parse(localStorage.getItem(KEY_DEL) || "[]");
+    const arr = Array.isArray(tomb) ? tomb : [];
+    if (id && arr.indexOf(id) < 0) {
+      arr.push(String(id).slice(0, 40));
+      localStorage.setItem(KEY_DEL, JSON.stringify(arr.slice(-60)));
+    }
+  } catch (error) { /* хранилище недоступно */ }
+  try { window.NeonBridgeYandex && window.NeonBridgeYandex.pushCloudMaps && window.NeonBridgeYandex.pushCloudMaps(); } catch (e) {}
+  renderMapCards();
+  selectMap(currentMap);
+}
+
+function mapPreviewSVG(mapPath) {
+  const pts = mapPath
+    .map(p => `${Math.max(0, Math.min(1000, p.x))},${Math.max(0, Math.min(640, p.y))}`)
+    .join(" ");
+  const s = mapPath[0];
+  const e = mapPath[mapPath.length - 1];
+  const ex = Math.max(40, Math.min(960, e.x));
+  return (
+    '<svg viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+    `<polyline points="${pts}" fill="none" stroke="#74c476" stroke-opacity=".14" stroke-width="76" stroke-linejoin="round" stroke-linecap="round"/>` +
+    `<polyline points="${pts}" fill="none" stroke="#45577e" stroke-opacity=".9" stroke-width="30" stroke-linejoin="round" stroke-linecap="round"/>` +
+    `<polyline points="${pts}" fill="none" stroke="#eef1f7" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="28 18"/>` +
+    `<circle cx="${Math.max(14, s.x)}" cy="${s.y}" r="30" fill="#1f2638" stroke="#5b9fd6" stroke-width="11"/>` +
+    `<circle cx="${ex}" cy="${e.y}" r="60" fill="rgba(223,106,95,.16)"/>` +
+    `<circle cx="${ex}" cy="${e.y}" r="30" fill="#1a1330" stroke="#df6a5f" stroke-width="11"/>` +
+    "</svg>"
+  );
+}
+
+function renderMapCards() {
+  if (!mapList) return;
+  const stored = readCustomMaps();
+  for (const m of stored) maps[m.id] = m;
+  // Карты, удалённые в редакторе, вычищаем и из памяти.
+  for (const id of Object.keys(maps)) {
+    if (maps[id].custom && !stored.some(s => s.id === id)) delete maps[id];
+  }
+  const ids = BUILTIN_MAP_IDS.slice();
+  for (const m of stored) {
+    if (ids.indexOf(m.id) < 0) ids.push(m.id);
+  }
+  if (!maps[currentMap]) {
+    currentMap = "ridge";
+    path = maps.ridge.path;
+    PATH_LENGTH = totalPathLength();
+  }
+
+  let html = "";
+  for (const id of ids) {
+    const m = maps[id];
+    if (!m) continue;
+    html +=
+      `<button class="map-card${id === currentMap ? " active" : ""}" data-map="${id}" type="button">` +
+      `<span class="map-preview real">${mapPreviewSVG(m.path)}</span>` +
+      `<span><b>${escapeHtmlText(m.name)}</b><small>${escapeHtmlText(m.description || "")}</small></span>` +
+      (m.custom ? `<span class="map-card-del" data-del-map="${id}" title="${escapeHtmlText(tl("ui.deleteMap"))}">&#10005;</span>` : "") +
+      "</button>";
+  }
+  html +=
+    '<button class="map-card map-card-new" data-open-editor="1" type="button" title="' + escapeHtmlText(tl("ui.editorBtnTitle")) + '">' +
+    '<span class="map-preview map-preview-new">+</span>' +
+    `<span><b>${escapeHtmlText(tl("ui.customNewCard"))}</b><small>${escapeHtmlText(tl("ui.openEditor"))}</small></span></button>`;
+  mapList.innerHTML = html;
+  if (selectedMapNameEl && maps[currentMap]) {
+    selectedMapNameEl.textContent = maps[currentMap].name;
+  }
+}
+
+/* Редактор открывается в ЭТОЙ ЖЕ вкладке (не popup): всплывающие окна
+   блокируются песочницей Яндекс.Игр и file:// не даёт общий localStorage
+   iframe'у. Навигация сохраняет общий origin => редактор и игра видят один
+   и тот же набор карт, а по возврату boot перечитывает хранилище. */
+function openMapEditor() {
+  try {
+    window.location.href = "editor.html";
+  } catch (error) {
+    /* навигация недоступна */
+  }
+}
 
 /* =========================================================
    ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -566,8 +877,8 @@ function isOnRoad(x, y) {
 ========================================================= */
 
 function isTowerUnlocked(type) {
-  const unlockWave = towerTypes[type]?.unlockWave;
-  return !unlockWave || state.wave >= unlockWave;
+  const unlockKills = towerTypes[type]?.unlockKills;
+  return !unlockKills || state.kills >= unlockKills;
 }
 
 function updateTowerAvailability() {
@@ -594,19 +905,20 @@ function updateTowerAvailability() {
 
     if (name) name.textContent = unlocked ? def.name : "???";
     if (desc) {
-      if (unlocked) {
-        desc.textContent = def.description || desc.dataset.defaultText || "";
-      } else {
-        desc.textContent = def.unlockWave
-          ? `Открывается с ${def.unlockWave}-й волны`
-          : "Скрытая башня";
-      }
+      // Описание показываем всегда — даже закрытая башня должна «манить».
+      desc.textContent = def.description || desc.dataset.defaultText || "";
     }
     if (price) price.textContent = unlocked ? `$${def.cost}` : "???";
+    if (mysteryIcon && def.unlockKills) {
+      // число-ключ на иконке «?» (пилюлю рисует CSS ::after)
+      mysteryIcon.dataset.wave = String(def.unlockKills);
+    }
     if (unlock) {
       unlock.textContent = unlocked
         ? (unlock.dataset.defaultText || "")
-        : "";
+        : (def.unlockKills
+            ? tl("ui.unlockKills", { n: def.unlockKills })
+            : tl("ui.hiddenTower"));
     }
   });
 }
@@ -674,7 +986,7 @@ function placeSelectedTower(x, y) {
     clearTowerTypeSelection();
     state.selectedTower = null;
         state.rangeUpgradeHover = false;
-    setHint("Недостаточно долларов. Выбор башни снят.");
+    setHint(tl("hint.noMoney"));
     updateUi();
     return;
   }
@@ -683,7 +995,7 @@ function placeSelectedTower(x, y) {
     clearTowerTypeSelection();
     state.selectedTower = null;
         state.rangeUpgradeHover = false;
-    setHint("Здесь нельзя поставить башню. Выбор башни снят.");
+    setHint(tl("hint.noPlace"));
     updateUi();
     return;
   }
@@ -723,7 +1035,7 @@ function placeSelectedTower(x, y) {
   clearTowerTypeSelection();
 
   setHint(
-      `${type.name} установлена. Выберите башню заново для следующей установки.`
+      tl("hint.placed", { n: type.name })
   );
 
   updateUi();
@@ -734,50 +1046,87 @@ function placeSelectedTower(x, y) {
    ПАРАМЕТРЫ БАШНИ
 ========================================================= */
 
+/* Тир-модель улучшений — как в Onslaught 2.2: каждое значение хранится
+   отдельным элементом массива, максимум уровня = длина массива. kind:
+   'damage' | 'range' | 'speed' */
+function statTiers(type, kind) {
+  const t = towerTypes[type];
+  if (!t) return [];
+  return kind === "damage" ? (t.dmgTiers || [])
+       : kind === "range"  ? (t.rngTiers || [])
+       : (t.rateTiers || []);
+}
+function statMaxLevel(type, kind) {
+  return Math.max(1, statTiers(type, kind).length);
+}
+function isStatMaxed(tower, kind) {
+  return (tower[`${kind}Level`] || 1) >= statMaxLevel(tower.type, kind);
+}
+function isDamageMaxed(tower) {
+  return isStatMaxed(tower, "damage");
+}
+function tierValue(type, kind, level) {
+  const tiers = statTiers(type, kind);
+  if (!tiers.length) {
+    // Саппорты и совместимость со старыми сохранами: без таблицы берём базовое поле.
+    const base = towerTypes[type];
+    if (!base) return 0;
+    return kind === "damage" ? (base.damage || 0)
+         : kind === "range"  ? (base.range || 0)
+         : 0;
+  }
+  return tiers[Math.min(tiers.length, Math.max(1, level)) - 1];
+}
+
+function tierInterval(type, level) {
+  const base = towerTypes[type];
+  const tiers = statTiers(type, "speed");
+  if (!tiers.length) return base?.fireRate || 1;
+  const pts = tiers[Math.min(tiers.length, Math.max(1, level)) - 1] || 100;
+  return (base.rofK || 45) / pts;
+}
+
 function getTowerStats(tower) {
   const base = towerTypes[tower.type];
   const damageLevel = tower.damageLevel || 1;
   const rangeLevel = tower.rangeLevel || 1;
   const speedLevel = tower.speedLevel || 1;
 
-  const d = Math.max(0, damageLevel - 1);
-  // Урон растёт всё быстрее с каждым уровнем: первые улучшения умеренные,
-  // высокие уровни становятся заметно сильнее и дороже.
-  let damage = base.damage * (1 + d * 0.24 + d * d * 0.025);
-  let range = base.range + (rangeLevel - 1) * 12;
-  let fireRate = Math.max(
-      0.12,
-      base.fireRate * Math.pow(0.94, speedLevel - 1) *
-        (tower.speedOverdrive ? 0.5 : 1)
-  );
+  let damage = tierValue(tower.type, "damage", damageLevel);
+  let range = tierValue(tower.type, "range", rangeLevel);
+
+  // Скорострельность: очки ROF из таблицы -> интервал в секундах.
+  let interval = tierInterval(tower.type, speedLevel);
 
   if (!isSupportType(tower.type)) {
     const support = getSupportBonus(tower);
     damage *= 1 + support.damage;
-    range += support.range;
-    fireRate *= 1 - support.speed;
+    range = range * (1 + support.rangePct) + support.rangeFlat;
+    interval /= 1 + support.ratePct;
+  }
+
+  // Freak Out (Cannon/Tazer): в четыре раза быстрее, в три сильнее.
+  if (tower.speedOverdrive) {
+    damage *= 3;
+    interval /= 4;
   }
 
   return {
     damage: Math.round(damage),
     range,
-    fireRate: Math.max(0.08, fireRate)
+    fireRate: Math.max(0.08, interval)
   };
 }
 
 function getProjectedFireRate(tower, speedLevel) {
-  const base = towerTypes[tower.type];
-  let fireRate = Math.max(
-      0.12,
-      base.fireRate * Math.pow(0.94, Math.max(0, speedLevel - 1))
-  );
+  let interval = tierInterval(tower.type, speedLevel);
 
   if (!isSupportType(tower.type)) {
     const support = getSupportBonus(tower);
-    fireRate *= 1 - support.speed;
+    interval /= 1 + support.ratePct;
   }
 
-  return Math.max(0.08, fireRate);
+  return Math.max(0.08, interval);
 }
 
 function isSupportType(type) {
@@ -785,20 +1134,25 @@ function isSupportType(type) {
 }
 
 function getSupportBonus(tower) {
-  const result = { damage: 0, range: 0, speed: 0 };
-  if (isSupportType(tower.type)) return result;
+  const result = { damage: 0, rangePct: 0, rangeFlat: 0, ratePct: 0 };
+  if (isSupportType(tower.type) || ADVANCED_TYPES.includes(tower.type)) return result;
 
   for (const support of state.towers) {
     const supportType = towerTypes[support.type];
     if (!supportType?.support) continue;
     if (distance(support, tower) <= supportType.range) {
-      result.damage += supportType.support.damage || 0;
-      result.range += supportType.support.range || 0;
-      result.speed += supportType.support.speed || 0;
+      result.damage += supportType.support.dmgPct || 0;
+      result.rangePct += supportType.support.rngPct || 0;
+      result.rangeFlat += supportType.support.rngFlat || 0;
+      result.ratePct += supportType.support.ratePct || 0;
     }
   }
 
-  result.speed = Math.min(0.45, result.speed);
+  // Правила Onslaught: % урона и радиуса складываются; Rate-модификаторы
+  // стакаются примерно два-три раза, после чего упираются в предел снаряда.
+  result.ratePct = Math.min(2.2, Math.max(-0.75, result.ratePct));
+  result.damage = Math.max(-0.75, result.damage);
+  result.rangePct = Math.max(-0.75, result.rangePct);
   return result;
 }
 
@@ -852,14 +1206,19 @@ function totalPathLength() {
 
 let PATH_LENGTH = totalPathLength();
 
+/* Сложность — официальные кривые HP из Onslaught 2.2 (FAQ): множитель шага
+   w->w+1 в зависимости от диапазона волн. HP(1) = 10, всё остальное —
+   произведение шаговых множителей. Extreme (плоский x1.125) у нас не
+   представлен четвёртой карточкой, его роль у нас — «Сложный» выше. */
 const difficulties = {
   easy: {
     name: "Легкий",
-    hpMultiplier: 0.78,
+    hpMultiplier: 1.00,
     speedMultiplier: 0.90,
     countMultiplier: 0.88,
-    rewardMultiplier: 1.18,
-    waveRewardMultiplier: 1.15
+    rewardMultiplier: 1.00,
+    waveRewardMultiplier: 1.15,
+    hpSegments: [[1, 1.3], [10, 1.2], [30, 1.15], [40, 1.1], [60, 1.09], [80, 1.05], [100, 1.04], [120, 1.03], [200, 1.02]]
   },
   normal: {
     name: "Средний",
@@ -867,15 +1226,17 @@ const difficulties = {
     speedMultiplier: 1.00,
     countMultiplier: 1.00,
     rewardMultiplier: 1.00,
-    waveRewardMultiplier: 1.00
+    waveRewardMultiplier: 1.00,
+    hpSegments: [[1, 1.3], [10, 1.2], [20, 1.25], [30, 1.15], [40, 1.1], [60, 1.09], [80, 1.05], [100, 1.04], [120, 1.03], [200, 1.02]]
   },
   hard: {
     name: "Сложный",
-    hpMultiplier: 1.30,
+    hpMultiplier: 1.00,
     speedMultiplier: 1.10,
     countMultiplier: 1.14,
-    rewardMultiplier: 0.88,
-    waveRewardMultiplier: 0.90
+    rewardMultiplier: 1.00,
+    waveRewardMultiplier: 0.90,
+    hpSegments: [[1, 1.4], [10, 1.3], [30, 1.2], [40, 1.1], [60, 1.05], [100, 1.04], [120, 1.03], [200, 1.02]]
   }
 };
 
@@ -885,28 +1246,32 @@ function getDifficulty() {
   return difficulties[currentDifficulty] || difficulties.normal;
 }
 
+// Официальная базовая кривая: HP(1)=10, шаг зависит от сегмента сложности.
+const hpCurveCache = {};
+function hpAtWave(w) {
+  const key = currentDifficulty;
+  const cache = hpCurveCache[key] || (hpCurveCache[key] = [null, 10]);
+  const segments = getDifficulty().hpSegments;
+  for (let i = cache.length; i <= w; i++) {
+    let f = segments[segments.length - 1][1];
+    for (const [start, factor] of segments) {
+      if (i - 1 >= start) f = factor;
+      else break;
+    }
+    // i-1 — номер волны, из которой делаем шаг (сегменты заданы по «from wave»)
+    cache[i] = cache[i - 1] * f;
+  }
+  return cache[w];
+}
+
 function getWaveScaling(wave) {
   const w = Math.max(1, wave);
   const difficulty = getDifficulty();
 
-  // Ранние волны остаются дружелюбными, но после 100-й начинается
-  // заметно более резкий Onslaught-подобный разгон сложности.
-  const earlyHp = Math.pow(1 + 0.085 * (w - 1), 1.12);
-  const late = Math.max(0, w - 100);
-  const brutal = Math.max(0, w - 220);
-  const lateHpMultiplier =
-      Math.pow(1 + late * 0.0105, 1.22) *
-      Math.pow(1 + brutal * 0.016, 1.30);
-  const hpGrowth = earlyHp * lateHpMultiplier;
+  const hp = hpAtWave(w) * difficulty.hpMultiplier;
 
   const speedGrowth =
       Math.min(2.35, 1 + 0.0105 * (w - 1) + Math.max(0, w - 160) * 0.0015);
-
-  // Награда больше не растёт пропорционально номеру волны: иначе поздняя
-  // экономика начинает бесконечно опережать здоровье врагов.
-  const rewardGrowth =
-      1 + 0.042 * Math.min(w, 80) +
-      0.018 * Math.sqrt(Math.max(0, w - 80));
 
   const countGrowth =
       6 +
@@ -915,9 +1280,10 @@ function getWaveScaling(wave) {
       Math.floor(Math.max(0, w - 180) * 0.035);
 
   return {
-    hp: Math.max(1, 70 * hpGrowth * difficulty.hpMultiplier),
+    hp: Math.max(1, hp),
     speed: 45 * speedGrowth * difficulty.speedMultiplier,
-    reward: Math.max(1, 7 * rewardGrowth * difficulty.rewardMultiplier),
+    // Каллибровка под оригинал: награда пропорциональна здоровью (~$5 на w1).
+    reward: Math.max(1, hp * 0.5 * difficulty.rewardMultiplier),
     count: Math.max(4, Math.round(countGrowth * difficulty.countMultiplier)),
     spawnInterval: Math.max(0.20, 0.72 - Math.min(0.43, (w - 1) * 0.0038))
   };
@@ -925,43 +1291,213 @@ function getWaveScaling(wave) {
 
 
 const enemyTypes = [
-  { color: "#ff5277", glow: "#ff5277", shape: "circle" },
-  { color: "#ff9f43", glow: "#ff9f43", shape: "square" },
-  { color: "#ffe66d", glow: "#ffe66d", shape: "triangle" },
-  { color: "#62f6ff", glow: "#62f6ff", shape: "diamond" },
-  { color: "#5c7cfa", glow: "#5c7cfa", shape: "hex" },
-  { color: "#b86bff", glow: "#b86bff", shape: "star" },
-  { color: "#42e6a4", glow: "#42e6a4", shape: "pentagon" },
-  { color: "#f36cff", glow: "#f36cff", shape: "cross" },
-  { color: "#78a9ff", glow: "#78a9ff", shape: "octagon" },
-  { color: "#ff6b9a", glow: "#ff6b9a", shape: "bolt" }
+  { color: "#df6a5f", glow: "#df6a5f", shape: "circle" },
+  { color: "#e08b52", glow: "#e08b52", shape: "square" },
+  { color: "#e8b64c", glow: "#e8b64c", shape: "triangle" },
+  { color: "#8fd0e8", glow: "#8fd0e8", shape: "diamond" },
+  { color: "#5b9fd6", glow: "#5b9fd6", shape: "hex" },
+  { color: "#eec76a", glow: "#eec76a", shape: "star" },
+  { color: "#74c476", glow: "#74c476", shape: "pentagon" },
+  { color: "#cf8e97", glow: "#cf8e97", shape: "cross" },
+  { color: "#e8a04c", glow: "#e8a04c", shape: "octagon" },
+  { color: "#eef1f7", glow: "#eef1f7", shape: "bolt" }
 ];
 
 function getEnemyType(waveNumber) {
   return enemyTypes[(Math.max(1, waveNumber) - 1) % enemyTypes.length];
 }
 
-function drawEnemyShape(x, y, radius, shape) {
-  ctx.beginPath();
-  if (shape === "circle") { ctx.arc(x, y, radius, 0, Math.PI * 2); return; }
-  if (shape === "square") { ctx.rect(x - radius, y - radius, radius * 2, radius * 2); return; }
-  const count = shape === "triangle" ? 3 : shape === "pentagon" ? 5 : shape === "hex" ? 6 : shape === "octagon" ? 8 : shape === "diamond" ? 4 : 5;
-  if (shape === "cross") {
-    ctx.moveTo(x - radius * .35, y - radius); ctx.lineTo(x + radius * .35, y - radius);
-    ctx.lineTo(x + radius * .35, y - radius * .35); ctx.lineTo(x + radius, y - radius * .35);
-    ctx.lineTo(x + radius, y + radius * .35); ctx.lineTo(x + radius * .35, y + radius * .35);
-    ctx.lineTo(x + radius * .35, y + radius); ctx.lineTo(x - radius * .35, y + radius);
-    ctx.lineTo(x - radius * .35, y + radius * .35); ctx.lineTo(x - radius, y + radius * .35);
-    ctx.lineTo(x - radius, y - radius * .35); ctx.lineTo(x - radius * .35, y - radius * .35); ctx.closePath(); return;
+function drawEnemyShipHull(shape, r, color) {
+  // Рисует корпус в локальных координатах: нос направлен вдоль +x.
+  ctx.fillStyle = "#1f2638";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.8;
+
+  if (shape === "hex") {
+    // НЛО: тарелка с куполом и мигающими огнями по ободу.
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 1.18, r * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.45, -r * 0.1);
+    ctx.arc(0, -r * 0.1, r * 0.45, Math.PI, 0);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(238,241,247, 0.9)";
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.stroke();
+
+    const lightsT = performance.now() / 1000;
+    for (let i = 0; i < 5; i++) {
+      const lx = -r * 0.85 + (i * r * 1.7) / 4;
+      ctx.globalAlpha = 0.3 + 0.7 * Math.max(0, Math.sin(lightsT * 5 + i * 1.7));
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(lx, r * 0.26, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (shape === "triangle") {
+    // Перехватчик: острый дротик.
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35, 0);
+    ctx.lineTo(-r * 0.6, -r * 0.62);
+    ctx.lineTo(-r * 0.25, 0);
+    ctx.lineTo(-r * 0.6, r * 0.62);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(r * 0.35, 0, 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (shape === "pentagon") {
+    // Истребитель: дротик с широкими крыльями.
+    ctx.beginPath();
+    ctx.moveTo(r * 1.25, 0);
+    ctx.lineTo(-r * 0.2, -r * 0.5);
+    ctx.lineTo(-r * 0.9, -r * 1.02);
+    ctx.lineTo(-r * 0.45, -r * 0.28);
+    ctx.lineTo(-r * 0.75, 0);
+    ctx.lineTo(-r * 0.45, r * 0.28);
+    ctx.lineTo(-r * 0.9, r * 1.02);
+    ctx.lineTo(-r * 0.2, r * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#eef1f7";
+    ctx.beginPath();
+    ctx.arc(r * 0.3, 0, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (shape === "diamond") {
+    // Разведчик: ромб с кабиной.
+    ctx.beginPath();
+    ctx.moveTo(r * 1.25, 0);
+    ctx.lineTo(0, -r * 0.72);
+    ctx.lineTo(-r * 1.05, 0);
+    ctx.lineTo(0, r * 0.72);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.55, 0);
+    ctx.lineTo(0, -r * 0.28);
+    ctx.lineTo(-r * 0.4, 0);
+    ctx.lineTo(0, r * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (shape === "square" || shape === "octagon") {
+    // Бомбардировщик/крейсер: бронированный корпус с плитами.
+    const k = shape === "square" ? 0.92 : 1.1;
+    ctx.beginPath();
+    ctx.moveTo(r * 1.2 * k, -r * 0.42);
+    ctx.lineTo(r * 0.35, -r * 0.8 * k);
+    ctx.lineTo(-r * 1.0 * k, -r * 0.8 * k);
+    ctx.lineTo(-r * 1.0 * k, r * 0.8 * k);
+    ctx.lineTo(r * 0.35, r * 0.8 * k);
+    ctx.lineTo(r * 1.2 * k, r * 0.42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.35, -r * 0.8 * k);
+    ctx.lineTo(-r * 0.35, r * 0.8 * k);
+    ctx.moveTo(r * 0.25, -r * 0.6 * k);
+    ctx.lineTo(r * 0.25, r * 0.6 * k);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(r * 0.62, 0, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (shape === "star") {
+    // Штурмовик: корпус с тремя лезвиями.
+    ctx.beginPath();
+    ctx.moveTo(r * 1.3, 0);
+    ctx.lineTo(r * 0.1, -r * 0.35);
+    ctx.lineTo(-r * 0.2, -r * 1.05);
+    ctx.lineTo(-r * 0.45, -r * 0.3);
+    ctx.lineTo(-r * 0.95, -r * 0.5);
+    ctx.lineTo(-r * 0.7, 0);
+    ctx.lineTo(-r * 0.95, r * 0.5);
+    ctx.lineTo(-r * 0.45, r * 0.3);
+    ctx.lineTo(-r * 0.2, r * 1.05);
+    ctx.lineTo(r * 0.1, r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#eef1f7";
+    ctx.beginPath();
+    ctx.arc(r * 0.3, 0, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (shape === "cross") {
+    // Носитель: крестообразный корпус с широкими крыльями.
+    ctx.beginPath();
+    ctx.moveTo(r * 1.2, -r * 0.25);
+    ctx.lineTo(r * 1.2, r * 0.25);
+    ctx.lineTo(r * 0.3, r * 0.3);
+    ctx.lineTo(r * 0.3, r * 0.95);
+    ctx.lineTo(-r * 0.3, r * 0.95);
+    ctx.lineTo(-r * 0.3, r * 0.3);
+    ctx.lineTo(-r * 1.05, r * 0.3);
+    ctx.lineTo(-r * 1.05, -r * 0.3);
+    ctx.lineTo(-r * 0.3, -r * 0.3);
+    ctx.lineTo(-r * 0.3, -r * 0.95);
+    ctx.lineTo(r * 0.3, -r * 0.95);
+    ctx.lineTo(r * 0.3, -r * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (shape === "bolt") {
+    // Рейдер: асимметричный молниеносный корпус.
+    ctx.beginPath();
+    ctx.moveTo(r * 1.25, -r * 0.2);
+    ctx.lineTo(r * 0.15, -r * 0.1);
+    ctx.lineTo(r * 0.45, -r * 0.85);
+    ctx.lineTo(-r * 1.0, -r * 0.2);
+    ctx.lineTo(-r * 0.35, 0);
+    ctx.lineTo(-r * 1.05, r * 0.6);
+    ctx.lineTo(-r * 0.15, r * 0.3);
+    ctx.lineTo(-r * 0.45, r * 1.0);
+    ctx.lineTo(r * 0.5, r * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#eef1f7";
+    ctx.beginPath();
+    ctx.arc(r * 0.55, 0, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Дрон: обтекаемая капсула с боковыми стабилизаторами.
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.8, -r * 0.15);
+    ctx.lineTo(-r * 1.3, -r * 0.55);
+    ctx.moveTo(-r * 0.8, r * 0.15);
+    ctx.lineTo(-r * 1.3, r * 0.55);
+    ctx.stroke();
+    ctx.fillStyle = "#eef1f7";
+    ctx.beginPath();
+    ctx.arc(r * 0.15, 0, 2.6, 0, Math.PI * 2);
+    ctx.fill();
   }
-  if (shape === "star") {
-    for (let i=0;i<10;i++) { const a=-Math.PI/2+i*Math.PI/5; const r=i%2?radius*.45:radius; const px=x+Math.cos(a)*r, py=y+Math.sin(a)*r; i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.closePath(); return;
-  }
-  if (shape === "bolt") {
-    ctx.moveTo(x+radius*.15,y-radius); ctx.lineTo(x-radius*.7,y+radius*.05); ctx.lineTo(x-radius*.08,y+radius*.02); ctx.lineTo(x-radius*.35,y+radius); ctx.lineTo(x+radius*.72,y-radius*.18); ctx.lineTo(x+radius*.12,y-radius*.12); ctx.closePath(); return;
-  }
-  for (let i=0;i<count;i++) { const a=-Math.PI/2+i*Math.PI*2/count; const px=x+Math.cos(a)*radius, py=y+Math.sin(a)*radius; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
-  ctx.closePath();
 }
 
 function spawnEnemy(waveNumber = state.wave) {
@@ -1017,10 +1553,23 @@ function updateEnemy(enemy, dt) {
     ensureAudio();
     playLeakSound();
 
+    // Красная пульсация по краям поля — потеря жизни.
+    state.effects.push({ type: "leakFlash", life: 0.5, maxLife: 0.5 });
+    // Ударная волна по ядру — враг дошёл до цели.
+    state.effects.push({
+      type: "comboBurst",
+      x: enemy.x,
+      y: enemy.y,
+      radius: 40,
+      life: 0.5,
+      maxLife: 0.5,
+      color: "#df6a5f"
+    });
+
     createExplosion(
         enemy.x,
         enemy.y,
-        "#ff5c7a"
+        "#c9504f"
     );
 
     if (state.lives <= 0) {
@@ -1037,8 +1586,45 @@ function updateEnemy(enemy, dt) {
 function createProjectile(tower, target) {
   const stats = getTowerStats(tower);
   const type = towerTypes[tower.type];
+  let damage = stats.damage;
 
-  state.projectiles.push({
+  // Fusion (Onslaught): выстрел забирает накопленный простой соседей.
+  if (type.fusion && tower.fusionCharge) {
+    damage += Math.round(tower.fusionCharge);
+    tower.fusionCharge = 0;
+  }
+
+  // Combonly (Onslaught): +30% урона каждой «в максимум» базовой турели рядом.
+  if (type.absorbs) {
+    let absorbed = 0;
+    for (const ally of state.towers) {
+      if (ally === tower || isSupportType(ally.type) || ADVANCED_TYPES.includes(ally.type)) continue;
+      if (isDamageMaxed(ally) && distance(ally, tower) <= stats.range) {
+        absorbed += getTowerStats(ally).damage * 0.30;
+      }
+    }
+    damage += Math.round(absorbed);
+  }
+
+  // Лазерная цепь (Laser из Onslaught): каждый зелёный сосед в радиусе
+  // добавляет своё звено: acc = acc×1.25 + урон соседа (соседи по близости).
+  const chainLinks = [];
+  if (type.laserChain) {
+    const assists = state.towers
+        .filter(candidate =>
+            candidate !== tower &&
+            candidate.type === "arc" &&
+            distance(candidate, tower) <= stats.range)
+        .sort((a, b) => distance(a, tower) - distance(b, tower))
+        .slice(0, 12);
+    for (const ally of assists) {
+      damage = damage * 1.25 + getTowerStats(ally).damage;
+      chainLinks.push(ally);
+    }
+    damage = Math.round(damage);
+  }
+
+  const projectile = {
     x: tower.x,
     y: tower.y,
 
@@ -1046,20 +1632,103 @@ function createProjectile(tower, target) {
 
     speed: type.projectileSpeed || 500,
 
-    damage: stats.damage,
+    damage,
 
     towerType: tower.type,
 
     splash: type.splash || 0,
 
     color: type.color
-  });
+  };
+
+  if (tower.type === "frost") {
+    projectile.slowLevel = tower.damageLevel || 1;
+  }
+
+  // Railgun (Onslaught): снаряд летит прямо и пробивает всех на линии.
+  if (type.pierce) {
+    projectile.pierce = true;
+    projectile.dx = 0;
+    projectile.dy = 0;
+    projectile.life = 0.9;
+  }
+
+  // Holding Pattern (Rocket с 4+4 апдейсами): без цели снаряд кружит над турелью.
+  if (tower.holdingReady) {
+    projectile.holdTower = tower;
+    projectile.holdRange = stats.range;
+  }
+
+  state.projectiles.push(projectile);
+
+  for (const ally of chainLinks) {
+    createLightning(ally, tower);
+  }
 }
 
 function updateProjectile(projectile, dt) {
-  if (!projectile.target || projectile.target.dead) {
+  if (projectile.pierce) {
+    const target = projectile.target;
+    if (!projectile.dx && target && !target.dead) {
+      const dx = target.x - projectile.x;
+      const dy = target.y - projectile.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      projectile.dx = dx / dist;
+      projectile.dy = dy / dist;
+    }
+    projectile.x += projectile.dx * projectile.speed * dt;
+    projectile.y += projectile.dy * projectile.speed * dt;
+    projectile.life -= dt;
+
+    if (!projectile.hitSet) projectile.hitSet = new Set();
+    for (const enemy of state.enemies) {
+      if (!enemy.dead && !projectile.hitSet.has(enemy) && distance(enemy, projectile) <= 18) {
+        projectile.hitSet.add(enemy);
+        enemy.hp -= projectile.damage;
+        createExplosion(enemy.x, enemy.y, projectile.color);
+        if (enemy.hp <= 0) {
+          killEnemy(enemy);
+        }
+      }
+    }
+
+    if (projectile.life <= 0 ||
+        projectile.x < -60 || projectile.x > GAME_WIDTH + 60 ||
+        projectile.y < -60 || projectile.y > GAME_HEIGHT + 60) {
+      projectile.dead = true;
+    }
+    return;
+  }
+
+  const holder = projectile.holdTower;
+  if (holder && !state.towers.includes(holder)) {
     projectile.dead = true;
     return;
+  }
+
+  if (!projectile.target || projectile.target.dead) {
+    if (holder) {
+      const candidate = state.enemies.find(enemy =>
+          !enemy.dead && distance(enemy, holder) <= projectile.holdRange);
+      if (candidate) {
+        projectile.target = candidate;
+        projectile.orbit = undefined;
+        projectile.holdAge = 0;
+      } else {
+        if (projectile.orbit === undefined) {
+          projectile.orbit = Math.atan2(projectile.y - holder.y, projectile.x - holder.x);
+        }
+        projectile.orbit += 2.6 * dt;
+        projectile.x = holder.x + Math.cos(projectile.orbit) * 34;
+        projectile.y = holder.y + Math.sin(projectile.orbit) * 34;
+        projectile.holdAge = (projectile.holdAge || 0) + dt;
+        if (projectile.holdAge > 60) projectile.dead = true;
+        return;
+      }
+    } else {
+      projectile.dead = true;
+      return;
+    }
   }
 
   const target = projectile.target;
@@ -1101,8 +1770,9 @@ function hitTarget(projectile, target) {
   const type = towerTypes[projectile.towerType];
 
   if (type.slow) {
+    // Яд Tazer: чем выше уровень урона, тем дольше врагов «ведёт».
     target.slowMultiplier = type.slow;
-    target.slowTimer = type.slowTime;
+    target.slowTimer = (type.slowTime || 1.5) + Math.max(0, (projectile.slowLevel || 1) - 1) * 0.15;
   }
 
   if (projectile.splash) {
@@ -1127,12 +1797,8 @@ function hitTarget(projectile, target) {
     );
   }
 
-  if (projectile.towerType === "arc") {
-    chainLightning(
-        target,
-        projectile.damage
-    );
-  }
+  // Цепная молния «Дуги» заменена лазерной цепью Onslaught (сбор урона
+  // в createProjectile); комбо «Цепная буря» по-прежнему бьёт цепью.
 
   if (target.hp <= 0) {
     killEnemy(target);
@@ -1187,7 +1853,7 @@ function killEnemy(enemy) {
   createExplosion(
       enemy.x,
       enemy.y,
-      "#ffffff"
+      "#eef1f7"
   );
 }
 
@@ -1234,7 +1900,7 @@ function getComboGroups() {
   for (let i = 0; i < state.towers.length; i++) {
     if (visited.has(i)) continue;
     const startTower = state.towers[i];
-    if ((startTower.damageLevel || 1) < MAX_UPGRADE_LEVEL) continue;
+    if (!isDamageMaxed(startTower)) continue;
 
     const queue = [i];
     const group = [];
@@ -1249,7 +1915,7 @@ function getComboGroups() {
         if (visited.has(j)) continue;
         const other = state.towers[j];
         if (other.type !== startTower.type) continue;
-        if ((other.damageLevel || 1) < MAX_UPGRADE_LEVEL) continue;
+        if (!isDamageMaxed(other)) continue;
         if (distance(tower, other) <= COMBO_RADIUS) {
           visited.add(j);
           queue.push(j);
@@ -1332,33 +1998,9 @@ function triggerCombo(group) {
   }
 
   if (isSupportType(tower.type)) {
-    // Поддерживающий прибор: корпус + центральное ядро.
-    ctx.beginPath();
-    ctx.rect(tower.x - 17, tower.y - 17, 34, 34);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 10, 0, Math.PI * 2);
-    ctx.strokeStyle = "#d8ffe7";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = type.color;
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Радиус усиления виден всегда, чтобы было понятно, какие башни получают бонус.
-    ctx.save();
-    ctx.setLineDash([6, 6]);
-    ctx.globalAlpha = 0.34 + 0.08 * Math.sin(performance.now() / 260);
-    ctx.strokeStyle = type.color;
-    ctx.shadowColor = type.color;
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, type.range, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    // Модули поддержки не имеют атакующего комбо — выходим сразу,
+    // иначе ветка «проваливалась» в чужие эффекты.
+    return;
   } else if (tower.type === "rail") {
     const targets = state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 4);
     for (const enemy of targets) {
@@ -1480,7 +2122,7 @@ function updateComboAbilities(dt) {
     }
 
     for (const tower of state.towers) {
-      if (!activeLeaders.has(tower) && (tower.damageLevel || 1) >= MAX_UPGRADE_LEVEL) {
+      if (!activeLeaders.has(tower) && isDamageMaxed(tower)) {
         tower.comboTimer = COMBO_CHECK_INTERVAL;
       }
     }
@@ -1499,7 +2141,7 @@ function updateMines(dt) {
     const victims = state.enemies.filter(enemy => !enemy.dead && distance(enemy, mine) <= mine.radius);
     if (mine.armed && victims.length) {
       mine.armed = false;
-      const targets = victims.sort((a, b) => b.distance - a.distance).slice(0, 5);
+      const targets = victims.sort((a, b) => b.distance - a.distance);
       for (const enemy of targets) {
         enemy.hp = 0;
         killEnemy(enemy);
@@ -1521,7 +2163,10 @@ function updateTowers(dt) {
       continue;
     }
 
-    if ((tower.speedLevel || 1) >= 6) {
+    // Freak Out (Cannon/Tazer из Onslaught): после 4 апдейсов урона И
+    // скорострельности турель периодически «срывает»: ×4 темп, ×3 урон.
+    const freakBase = towerTypes[tower.type];
+    if (freakBase.freakout && (tower.damageLevel || 1) >= 5 && (tower.speedLevel || 1) >= 5) {
       tower.speedOverdriveCheckTimer = Math.max(0, (tower.speedOverdriveCheckTimer ?? SPEED_OVERDRIVE_INTERVAL) - dt);
       if (tower.speedOverdriveCheckTimer <= 0) {
         tower.speedOverdriveCheckTimer = SPEED_OVERDRIVE_INTERVAL;
@@ -1536,6 +2181,26 @@ function updateTowers(dt) {
       tower.speedOverdriveCheckTimer = SPEED_OVERDRIVE_INTERVAL;
     }
 
+    // Holding Pattern (Rocket из Onslaught): держит залп в воздухе.
+    tower.holdingReady = !!freakBase.holding &&
+        (tower.rangeLevel || 1) >= 4 && (tower.speedLevel || 1) >= 4;
+
+    // Fusion (Onslaught): копит простой ударов соседей-лазеров/тейзеров.
+    if (freakBase.fusion) {
+      let idle = 0;
+      for (const ally of state.towers) {
+        if (ally === tower) continue;
+        if (ally.type === "arc" || ally.type === "frost") {
+          if (distance(ally, tower) <= freakBase.rngTiers[Math.min(freakBase.rngTiers.length, tower.rangeLevel || 1) - 1]) {
+            const allyStats = getTowerStats(ally);
+            idle += allyStats.damage / Math.max(0.08, allyStats.fireRate);
+          }
+        }
+      }
+      const myDps = getTowerStats(tower).damage / Math.max(0.08, getTowerStats(tower).fireRate);
+      tower.fusionCharge = Math.min(60 * Math.max(1, myDps), (tower.fusionCharge || 0) + idle * 0.6 * dt);
+    }
+
     if (tower.speedOverdrive) {
       tower.speedOverdriveTimer = Math.max(0, (tower.speedOverdriveTimer || 0) - dt);
       if (tower.speedOverdriveTimer <= 0) tower.speedOverdrive = false;
@@ -1544,12 +2209,18 @@ function updateTowers(dt) {
     if (tower.speedOverdriveShake > 0) {
       tower.speedOverdriveShake = Math.max(0, tower.speedOverdriveShake - dt);
     }
+    if (tower.muzzleFlash > 0) {
+      tower.muzzleFlash = Math.max(0, tower.muzzleFlash - dt);
+    }
     tower.cooldown -= dt;
 
     if (tower.cooldown > 0) continue;
     const target = findTarget(tower);
     if (!target) continue;
     createProjectile(tower, target);
+    // Наведение турели и короткая вспышка у среза ствола.
+    tower.aimAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
+    tower.muzzleFlash = 0.12;
     playShotSound(tower.type);
     const stats = getTowerStats(tower);
     tower.cooldown = stats.fireRate;
@@ -1660,12 +2331,12 @@ function startWave() {
   // Показываем только последнюю запущенную волну. Параллельные волны
   // продолжают работать внутри state.activeWaves, но их номера не
   // накапливаются в интерфейсе.
-  waveNameEl.textContent = `Волна ${waveNumber}`;
+  waveNameEl.textContent = tl("ui.waveName", { n: waveNumber });
 
   setHint(
       state.activeWaves.length > 1
-          ? `Запущена дополнительная волна ${waveNumber} параллельно текущей.`
-          : `Волна ${waveNumber} началась.`
+          ? tl("hint.waveParallel", { n: waveNumber })
+          : tl("hint.waveStarted", { n: waveNumber })
   );
 
   updateUi();
@@ -1715,9 +2386,9 @@ function updateWave(dt) {
 
     if (!spawning && !alive) {
       completed.push(wave.waveNumber);
+      // Onslaught: основной доход — награда за фраги; бонус за волну скромный.
       const reward = Math.round(
-          (25 + Math.floor(Math.min(wave.waveNumber, 120) * 2.5) +
-           Math.sqrt(Math.max(0, wave.waveNumber - 120)) * 7) *
+          Math.min(500, 8 + 1.5 * wave.waveNumber) *
           getDifficulty().waveRewardMultiplier
       );
       state.money += reward;
@@ -1731,15 +2402,15 @@ function updateWave(dt) {
 
   if (completed.length > 0) {
     const label = completed.length === 1
-        ? `Волна ${completed[0]} завершена.`
-        : `Завершены волны: ${completed.join(', ')}.`;
+        ? tl("hint.waveDone", { n: completed[0] })
+        : tl("hint.wavesDone", { n: completed.join(", ") });
 
     if (state.waveActive) {
-      setHint(`${label} Остальные запущенные волны продолжаются.`);
+      setHint(tl("hint.wavesDoneMore", { t: label }));
     } else {
       state.nextWaveTimer = 2.25;
-      waveNameEl.textContent = 'Готовность';
-      setHint(`${label} Следующая волна начнётся автоматически.`);
+      waveNameEl.textContent = tl("ui.ready");
+      setHint(tl("hint.wavesDoneNext", { t: label }));
     }
   }
 }
@@ -1749,24 +2420,22 @@ function updateWave(dt) {
    УЛУЧШЕНИЕ
 ========================================================= */
 
-// Стоимость следующего уровня.
-// Важно: функция должна быть доступна и панели выбора, и обработчикам кнопок.
+// Стоимость следующего уровня — официальные массивы upgDmg/upgRng/upgRate
+// из FAQ Onslaught 2.2 (цена уровня N+1 = элемент [N-1]).
 function getUpgradeCost(tower, kind) {
   if (!tower || !towerTypes[tower.type] || !["damage", "range", "speed"].includes(kind)) {
     return Infinity;
   }
 
   const level = tower[`${kind}Level`] || 1;
-  if (level >= MAX_UPGRADE_LEVEL || isSupportType(tower.type)) {
+  if (level >= statMaxLevel(tower.type, kind) || isSupportType(tower.type)) {
     return Infinity;
   }
 
-  const baseCost = Number(towerTypes[tower.type].cost) || 0;
-  const kindMultiplier = { damage: 0.34, range: 0.28, speed: 0.32 }[kind];
-  // Первые уровни доступны относительно дёшево, дальше цена ускоренно растёт, как в классической прогрессии Onslaught.
-  const levelMultiplier = Math.pow(1.90, level - 1);
-
-  return Math.max(10, Math.ceil(baseCost * kindMultiplier * levelMultiplier / 5) * 5);
+  const type = towerTypes[tower.type];
+  const list = kind === "damage" ? type.upgDmg : kind === "range" ? type.upgRng : type.upgRate;
+  const cost = list ? list[level - 1] : undefined;
+  return cost && cost > 0 ? cost : Infinity;
 }
 
 function upgradeTowerStat(kind) {
@@ -1776,14 +2445,14 @@ function upgradeTowerStat(kind) {
   }
 
   const currentLevel = tower[`${kind}Level`] || 1;
-  if (currentLevel >= MAX_UPGRADE_LEVEL) {
-    setHint(`${towerTypes[tower.type].name}: этот параметр уже на максимуме.`);
+  if (isStatMaxed(tower, kind)) {
+    setHint(tl("hint.maxedStat", { n: towerTypes[tower.type].name }));
     return;
   }
 
   const cost = getUpgradeCost(tower, kind);
   if (state.money < cost) {
-    setHint("Недостаточно долларов для улучшения.");
+    setHint(tl("hint.noMoneyUpgrade"));
     return;
   }
 
@@ -1791,20 +2460,20 @@ function upgradeTowerStat(kind) {
   tower[`${kind}Level`] = (tower[`${kind}Level`] || 1) + 1;
   tower.totalSpent += cost;
 
-  if (kind === 'speed' && tower['speedLevel'] === 6) {
+  if (kind === 'speed' && tower['speedLevel'] === 5) {
     tower.speedOverdrive = false;
     tower.speedOverdriveTimer = 0;
     tower.speedOverdriveCheckTimer = SPEED_OVERDRIVE_INTERVAL;
   }
 
   const names = {
-    damage: 'урон',
-    range: 'радиус',
-    speed: 'скорость атаки'
+    damage: tl('hint.pName.damage'),
+    range: tl('hint.pName.range'),
+    speed: tl('hint.pName.speed')
   };
 
   setHint(
-      `${towerTypes[tower.type].name}: ${names[kind]} улучшен до уровня ${tower[`${kind}Level`]}.`
+      tl('hint.upgraded', { n: towerTypes[tower.type].name, p: names[kind], lvl: tower[`${kind}Level`] })
   );
   updateUi();
 }
@@ -1837,7 +2506,7 @@ function sellSelectedTower() {
   state.money += refund;
 
   setHint(
-      `Башня продана за $${refund}.`
+      tl("hint.sellGeneric", { n: refund })
   );
 
   updateUi();
@@ -1855,13 +2524,12 @@ function updateUi() {
       `$${Math.floor(state.money)}`;
 
   const lifeCount = Math.max(0, state.lives);
-  const maxLives = 12;
-  livesEl.innerHTML = Array.from({ length: maxLives }, (_, index) =>
-    `<span class="life-heart ${index < lifeCount ? "alive" : "lost"}" aria-hidden="true">♥</span>`
-  ).join("");
+  livesEl.innerHTML =
+      `<span class="life-heart ${lifeCount > 0 ? "alive" : "lost"}" aria-hidden="true">♥</span>` +
+      `<span class="life-count">${lifeCount}</span>`;
 
   waveEl.textContent =
-      `${state.wave} ∞`;
+      `${state.wave}`;
 
   killsEl.textContent =
       state.kills;
@@ -1883,51 +2551,56 @@ function updateUi() {
     const damageLevel = tower.damageLevel || 1;
     const rangeLevel = tower.rangeLevel || 1;
     const speedLevel = tower.speedLevel || 1;
-    const booster = tower.type === "booster" ? { damage: 0, range: 0, speed: 0 } : getBoosterBonus(tower);
-    const nextDamage = damageLevel < MAX_UPGRADE_LEVEL
-        ? Math.round(type.damage * (1 + damageLevel * 0.30) * (1 + booster.damage))
+    const support = tower.type === "booster" ? { damage: 0, rangePct: 0, rangeFlat: 0, ratePct: 0 } : getBoosterBonus(tower);
+
+    const damageMax = statMaxLevel(tower.type, "damage");
+    const rangeMax = statMaxLevel(tower.type, "range");
+    const speedMax = statMaxLevel(tower.type, "speed");
+
+    const nextDamage = damageLevel < damageMax
+        ? Math.round(tierValue(tower.type, "damage", damageLevel + 1) * (1 + support.damage))
         : stats.damage;
-    const nextRange = rangeLevel < MAX_UPGRADE_LEVEL
-        ? type.range + rangeLevel * 12 + booster.range
+    const nextRange = rangeLevel < rangeMax
+        ? tierValue(tower.type, "range", rangeLevel + 1) * (1 + support.rangePct) + support.rangeFlat
         : stats.range;
     const currentSpeed = 1 / getProjectedFireRate(tower, speedLevel);
-    const nextSpeed = speedLevel < MAX_UPGRADE_LEVEL
+    const nextSpeed = speedLevel < speedMax
         ? 1 / getProjectedFireRate(tower, speedLevel + 1)
         : currentSpeed;
 
-    const statRow = (label, kind, level, current, next) => {
-      const bars = Array.from({ length: MAX_UPGRADE_LEVEL }, (_, index) => {
+    const statRow = (label, kind, level, current, next, maxLevel) => {
+      const bars = Array.from({ length: maxLevel }, (_, index) => {
         const n = index + 1;
         const filled = n <= level;
-        const preview = n === level + 1 && level < MAX_UPGRADE_LEVEL;
-        return `<span class="stat-bar ${filled ? `filled ${kind}` : ''} ${preview ? `preview ${kind}` : ''}" title="${n === level ? `Текущий уровень: ${level}` : preview ? `Следующий уровень: ${level + 1}` : `Уровень ${n}`}" aria-hidden="true"></span>`;
+        const preview = n === level + 1 && level < maxLevel;
+        return `<span class="stat-bar ${filled ? `filled ${kind}` : ''} ${preview ? `preview ${kind}` : ''}" title="${n === level ? tl('ui.barCurrent', { n: level }) : preview ? tl('ui.barNext', { n: level + 1 }) : tl('ui.barLevel', { n })}" aria-hidden="true"></span>`;
       }).join('');
       const fmt = value => kind === 'speed' ? Number(value).toFixed(2) : Math.round(value);
-      const valueText = level >= MAX_UPGRADE_LEVEL
+      const valueText = level >= maxLevel
         ? `${label}: ${fmt(current)}`
         : `${label}: ${fmt(current)} → ${fmt(next)} <span>(+${fmt(Number(next) - Number(current))})</span>`;
       return `
         <div class="stat-preview">
           <span class="stat-preview-label">${label}</span>
           <div class="stat-bars-wrap">
-            <div class="stat-bars" aria-label="${label}: уровень ${level} из ${MAX_UPGRADE_LEVEL}${level < MAX_UPGRADE_LEVEL ? `, следующий уровень ${level + 1}` : ', максимум'}">${bars}</div>
+            <div class="stat-bars" aria-label="${tl('ui.barAria', { p: label, n: level, max: maxLevel, next: level < maxLevel ? tl('ui.barAriaNext', { n: level + 1 }) : tl('ui.barAriaMax') })}">${bars}</div>
             <div class="stat-value stat-value-${kind}">${valueText}</div>
           </div>
         </div>`;
     };
 
-    if (tower.type === "booster") {
+    if (isSupportType(tower.type)) {
       selectionInfo.innerHTML = `
         <div class="selection-title-row">
           <strong>${type.name}</strong>
           <span class="selection-cost">$${Math.floor(tower.totalSpent || type.cost)}</span>
         </div>
-        <p>${type.description || "Поддерживающий модуль"}</p>
-        <p>Радиус действия: ${Math.round(type.range)}</p>
+        <p>${type.description || tl("ui.supportDescFallback")}</p>
+        <p>${tl("ui.rangeShown", { n: Math.round(type.range) })}</p>
       `;
       upgradeBtn.textContent = type.name;
-      rangeBtn.textContent = "Радиус +";
-      speedBtnUpgrade.textContent = "Скорость +";
+      rangeBtn.textContent = tl("ui.upgRange");
+      speedBtnUpgrade.textContent = tl("ui.upgSpeed");
       upgradeBtn.disabled = true;
       rangeBtn.disabled = true;
       speedBtnUpgrade.disabled = true;
@@ -1938,17 +2611,17 @@ function updateUi() {
         <strong>${type.name}</strong>
         <span class="selection-cost">$${Math.floor(tower.totalSpent || type.cost)}</span>
       </div>
-      <p>Текущие параметры · следующий уровень подсвечен пунктиром</p>
+      <p>${tl('ui.currentStatsHint')}</p>
       <div class="stat-preview-list">
-        ${statRow('Урон', 'damage', damageLevel, stats.damage, nextDamage)}
-        ${statRow('Радиус', 'range', rangeLevel, Math.round(stats.range), Math.round(nextRange))}
-        ${statRow('Скорость', 'speed', speedLevel, currentSpeed, nextSpeed)}
+        ${statRow(tl('ui.statDamage'), 'damage', damageLevel, stats.damage, nextDamage, damageMax)}
+        ${statRow(tl('ui.statRange'), 'range', rangeLevel, Math.round(stats.range), Math.round(nextRange), rangeMax)}
+        ${statRow(tl('ui.statSpeed'), 'speed', speedLevel, currentSpeed, nextSpeed, speedMax)}
       </div>
     `;
 
-    upgradeBtn.textContent = damageCost === Infinity ? "Урон MAX" : `Урон + ($${damageCost})`;
-    rangeBtn.textContent = rangeCost === Infinity ? "Радиус MAX" : `Радиус + ($${rangeCost})`;
-    speedBtnUpgrade.textContent = speedCost === Infinity ? "Скорость MAX" : `Скорость + ($${speedCost})`;
+    upgradeBtn.textContent = damageCost === Infinity ? tl('ui.upgMax', { p: tl('ui.statDamage') }) : tl('ui.upgDamageCost', { n: damageCost });
+    rangeBtn.textContent = rangeCost === Infinity ? tl('ui.upgMax', { p: tl('ui.statRange') }) : tl('ui.upgRangeCost', { n: rangeCost });
+    speedBtnUpgrade.textContent = speedCost === Infinity ? tl('ui.upgMax', { p: tl('ui.statSpeed') }) : tl('ui.upgSpeedCost', { n: speedCost });
 
     upgradeBtn.disabled = damageCost === Infinity || state.money < damageCost;
     rangeBtn.disabled = rangeCost === Infinity || state.money < rangeCost;
@@ -1971,18 +2644,19 @@ function updateUi() {
         y: state.previewY || 0
       };
       const previewStats = getTowerStats(previewTower);
-      const previewDamage = Math.round(type.damage * 1.30);
-      const previewRange = Math.round(type.range + 12);
+      const previewDamage = tierValue(state.selectedType, "damage", Math.min(2, statTiers(state.selectedType, "damage").length));
+      const previewRange = tierValue(state.selectedType, "range", Math.min(2, statTiers(state.selectedType, "range").length));
       const previewSpeed = 1 / getProjectedFireRate(previewTower, 1);
-      const nextPreviewSpeed = 1 / getProjectedFireRate(previewTower, 2);
+      const nextPreviewSpeed = 1 / getProjectedFireRate(previewTower, Math.min(2, statTiers(state.selectedType, "speed").length));
       const previewStatRow = (label, kind, current, next) => {
+        const maxLevel = statMaxLevel(state.selectedType, kind);
         const fmt = value => kind === 'speed' ? Number(value).toFixed(2) : Math.round(value);
         return `
           <div class="stat-preview">
             <span class="stat-preview-label">${label}</span>
             <div class="stat-bars-wrap">
-              <div class="stat-bars" aria-label="${label}: уровень 1 из ${MAX_UPGRADE_LEVEL}">
-                ${Array.from({ length: MAX_UPGRADE_LEVEL }, (_, index) => `<span class="stat-bar ${index === 0 ? `filled ${kind}` : index === 1 ? `preview ${kind}` : ''}" aria-hidden="true"></span>`).join('')}
+              <div class="stat-bars" aria-label="${tl('ui.barAria', { p: label, n: 1, max: maxLevel, next: tl('ui.barAriaNext', { n: 2 }) })}">
+                ${Array.from({ length: maxLevel }, (_, index) => `<span class="stat-bar ${index === 0 ? `filled ${kind}` : index === 1 ? `preview ${kind}` : ''}" aria-hidden="true"></span>`).join('')}
               </div>
               <div class="stat-value stat-value-${kind}">${label}: ${fmt(current)} → ${fmt(next)} <span>(+${fmt(Number(next) - Number(current))})</span></div>
             </div>
@@ -1994,29 +2668,29 @@ function updateUi() {
           <strong>${type.name}</strong>
           <span class="selection-cost">$${type.cost}</span>
         </div>
-        <p>Улучшения после установки · следующий уровень подсвечен пунктиром</p>
-        ${isSupportType(type.name === 'Усилитель' ? 'booster' : state.selectedType)
-          ? `<p>${type.description || 'Поддерживающий модуль'} · радиус ${Math.round(type.range)}</p>`
+        <p>${tl('ui.upgradeHint')}</p>
+        ${isSupportType(state.selectedType)
+          ? `<p>${type.description || tl('ui.supportDescFallback')} · ${tl('ui.rangeSmall', { n: Math.round(type.range) })}</p>`
           : `<div class="stat-preview-list">
-              ${previewStatRow('Урон', 'damage', previewStats.damage, previewDamage)}
-              ${previewStatRow('Радиус', 'range', Math.round(previewStats.range), previewRange)}
-              ${previewStatRow('Скорость', 'speed', previewSpeed, nextPreviewSpeed)}
+              ${previewStatRow(tl('ui.statDamage'), 'damage', previewStats.damage, previewDamage)}
+              ${previewStatRow(tl('ui.statRange'), 'range', Math.round(previewStats.range), previewRange)}
+              ${previewStatRow(tl('ui.statSpeed'), 'speed', previewSpeed, nextPreviewSpeed)}
             </div>`}
-        <p>Выберите место на поле для установки.</p>
+        <p>${tl('ui.pickSpot')}</p>
       `;
     } else {
       selectionInfo.innerHTML = `
         <div class="selection-title-row">
-          <strong>Башня не выбрана</strong>
+          <strong>${tl('ui.towerNotSelected')}</strong>
           <span class="selection-cost">—</span>
         </div>
-        <p>Выберите башню справа для установки.</p>
+        <p>${tl('ui.pickTower')}</p>
       `;
     }
 
-    upgradeBtn.textContent = "Урон +";
-    rangeBtn.textContent = "Радиус +";
-    speedBtnUpgrade.textContent = "Скорость +";
+    upgradeBtn.textContent = tl("ui.upgDamage");
+    rangeBtn.textContent = tl("ui.upgRange");
+    speedBtnUpgrade.textContent = tl("ui.upgSpeed");
     upgradeBtn.disabled = true;
     rangeBtn.disabled = true;
     speedBtnUpgrade.disabled = true;
@@ -2031,18 +2705,18 @@ function updateUi() {
     const alive = state.enemies.filter(enemy => !enemy.dead).length;
 
     enemyCountEl.textContent =
-        `Активных волн: ${state.activeWaves.length} · мобов: ${spawningLeft + alive}`;
+        tl("ui.activeWaves", { n: state.activeWaves.length, m: spawningLeft + alive });
   } else {
     const seconds = Math.max(0, Math.ceil(state.nextWaveTimer));
     enemyCountEl.textContent = state.gameOver
-        ? "Волны остановлены"
-        : `Следующая волна через ${seconds}с`;
+        ? tl("ui.wavesStopped")
+        : tl("ui.nextWaveIn", { n: seconds });
   }
 
   if (nextWaveBtn) {
     nextWaveBtn.textContent = state.waveActive
-        ? `Запустить ещё одну волну`
-        : "Запустить волну";
+        ? tl("ui.startAnother")
+        : tl("ui.startWave");
     nextWaveBtn.disabled = state.gameOver;
   }
 }
@@ -2076,7 +2750,7 @@ canvas.addEventListener(
         state.selectedTower = null;
 
         setHint(
-            "Выделение снято. Теперь можно выбрать место для новой башни."
+            tl("hint.deselectPlace")
         );
 
         updateUi();
@@ -2095,7 +2769,7 @@ canvas.addEventListener(
             towerTypes[existing.type];
 
         setHint(
-            `${type.name}, уровень ${existing.level}.`
+            tl("ui.towerLevelHint", { n: type.name, lvl: existing.level })
         );
 
         updateUi();
@@ -2113,7 +2787,7 @@ canvas.addEventListener(
         state.selectedTower = null;
 
         setHint(
-            "Выделение снято. Теперь можно выбрать место для новой башни."
+            tl("hint.deselectPlace")
         );
 
         updateUi();
@@ -2156,7 +2830,7 @@ function selectTowerFromCard(event) {
   if (!towerTypes[type]) return;
 
   if (!isTowerUnlocked(type)) {
-    setHint(`Эта башня ещё не разблокирована. Нужна ${towerTypes[type].unlockWave}-я волна.`);
+    setHint(tl("ui.lockedKills", { n: towerTypes[type].unlockKills }));
     return;
   }
 
@@ -2169,7 +2843,7 @@ function selectTowerFromCard(event) {
   });
 
   state.previewValid = !wasSelected && !!state.selectedType && canPlaceTower(state.previewX, state.previewY);
-  setHint(wasSelected ? "Выбор башни снят. Теперь ни одна башня не выбрана." : `${towerTypes[type].name}: выберите место вне дороги.`);
+  setHint(wasSelected ? tl("hint.deselected") : tl("hint.selectSpot", { n: towerTypes[type].name }));
   updateUi();
 }
 
@@ -2249,8 +2923,8 @@ function setPaused(paused) {
 
   pauseBtn.textContent =
       state.paused
-          ? "Продолжить"
-          : "Пауза";
+          ? tl("ui.resume")
+          : tl("ui.pause");
 
   if (!state.paused) {
     state.lastTime = performance.now();
@@ -2329,7 +3003,7 @@ async function toggleFullscreen() {
       await document.exitFullscreen();
     }
   } catch (error) {
-    setHint("Полноэкранный режим недоступен в этом браузере.");
+    setHint(tl("hint.noFullscreen"));
   }
 }
 
@@ -2389,8 +3063,8 @@ if (fullscreenBtn) {
 document.addEventListener("fullscreenchange", () => {
   if (fullscreenBtn) {
     fullscreenBtn.textContent = document.fullscreenElement
-        ? "Выйти из полного экрана"
-        : "Весь экран";
+        ? tl("ui.exitFullscreen")
+        : tl("ui.fullscreen");
   }
 });
 
@@ -2417,15 +3091,57 @@ if (difficultyList) {
 mapList.addEventListener(
     "click",
     event => {
+      const del = event.target.closest("[data-del-map]");
+      if (del) {
+        event.stopPropagation();
+        deleteCustomMap(del.getAttribute("data-del-map"));
+        return;
+      }
+      const editor = event.target.closest("[data-open-editor]");
+      if (editor) {
+        openMapEditor();
+        return;
+      }
       const button = event.target.closest(".map-card");
-      if (!button) return;
+      if (!button || !button.dataset.map) return;
       selectMap(button.dataset.map);
     }
 );
 
+const openEditorBtn = document.getElementById("openEditorBtn");
+if (openEditorBtn) {
+  openEditorBtn.addEventListener("click", openMapEditor);
+}
+
+// Если пользователь сохранял карты в редакторе (в другой вкладке),
+// при возврате в меню список обновляется без перезагрузки страницы.
+let lastMapsSnapshot = "";
+window.addEventListener("focus", () => {
+  if (mainMenu && !mainMenu.classList.contains("hidden")) {
+    renderMapCards();
+    try {
+      const raw = localStorage.getItem(CUSTOM_MAPS_KEY) || "";
+      if (raw !== lastMapsSnapshot) {
+        lastMapsSnapshot = raw;
+        window.NeonBridgeYandex && window.NeonBridgeYandex.pushCloudMaps && window.NeonBridgeYandex.pushCloudMaps();
+      }
+    } catch (e) { /* хранилище недоступно */ }
+  }
+});
+
 restartBtn.addEventListener(
     "click",
-    startNewGame
+    () => {
+      // На Яндекс.Играх рестарт продолжится после полноэкранного рекламного
+      // блока (пользовательское действие -> логическая пауза, п. 4.4);
+      // локально restartGate сразу вызывает колбэк.
+      const run = () => startNewGame();
+      if (window.NeonBridgeYandex && typeof window.NeonBridgeYandex.restartGate === "function") {
+        window.NeonBridgeYandex.restartGate(run);
+      } else {
+        run();
+      }
+    }
 );
 
 if (endMenuBtn) {
@@ -2441,6 +3157,71 @@ if (newGameBtn) {
   newGameBtn.addEventListener("click", startNewGame);
 }
 
+/* ---- Rewarded-реклама: явная кнопка с бонусом (п. 4.5 требований) --------
+   Награда — только бонусные доллары, продолжение игры не требует рекламы.
+   Кнопка удаляется оболочкой game.js, если SDK нет (вне платформы). */
+const AD_MONEY_REWARD = 250;
+let adRewardBusy = false;
+function refreshAdRewardLabel() {
+  if (!adRewardBtn) return;
+  adRewardBtn.textContent = tl("ui.adReward", { n: AD_MONEY_REWARD });
+}
+if (adRewardBtn) {
+  refreshAdRewardLabel();
+  adRewardBtn.addEventListener("click", () => {
+    if (adRewardBusy || state.gameOver || state.paused) return;
+    const bridge = window.NeonBridgeYandex;
+    if (!bridge || typeof bridge.showRewardedAd !== "function") return;
+    adRewardBusy = true;
+    adRewardBtn.disabled = true;
+    const release = () => {
+      setTimeout(() => {
+        adRewardBusy = false;
+        adRewardBtn.disabled = !!state.gameOver;
+      }, 1500);
+    };
+    const shown = bridge.showRewardedAd(
+        () => {
+          state.money += AD_MONEY_REWARD;
+          setHint(tl("hint.adGranted", { n: AD_MONEY_REWARD }));
+          updateUi();
+        },
+        release
+    );
+    if (!shown) {
+      adRewardBusy = false;
+      adRewardBtn.disabled = false;
+      setHint(tl("hint.adUnavailable"));
+    }
+  });
+}
+
+/* Мост для оболочки: объединение облачных карт применено к localStorage —
+   перечитать хранилище и обновить список в меню. */
+window.NeonGameBridge = {
+  mapsRestored() {
+    try {
+      mergeCustomMaps();
+      renderMapCards();
+      selectMap(currentMap);
+    } catch (e) { /* меню ещё не готово */ }
+  },
+  /* После облачного восстановления перечитать состояние кнопки «Продолжить». */
+  refreshMenu() {
+    try { updateResumeButton(); } catch (e) { /* noop */ }
+  }
+};
+
+/* Хуки для оболочки game.js (разметка геймплея, пауза). */
+window.NeonGameHooks = {
+  isPaused: () => !!state.paused,
+  isGameOver: () => !!state.gameOver,
+  // Прямое управление паузой без синтетических кликов (панель отладки SDK,
+  // переключение вкладок): пауза не должна зависеть от listeners в DOM.
+  pause() { if (!state.gameOver) setPaused(true); },
+  resume() { if (!state.gameOver) setPaused(false); }
+};
+
 // Намеренно НЕ сохраняем игру при обновлении/закрытии страницы.
 // «Продолжить игру» появляется только после явного выхода в главное меню
 // из активной партии.
@@ -2451,7 +3232,9 @@ if (newGameBtn) {
 ========================================================= */
 
 function drawBackground() {
-  ctx.fillStyle = "#07101b";
+  const t = performance.now() / 1000;
+
+  ctx.fillStyle = "#151a2b";
   ctx.fillRect(
       0,
       0,
@@ -2460,10 +3243,25 @@ function drawBackground() {
   );
 
   /*
-   * Сетка.
+   * Мягкие «туманности» — глубина сцены.
    */
-  ctx.strokeStyle =
-      "rgba(80, 180, 255, 0.07)";
+  const blobA = ctx.createRadialGradient(180, 110, 20, 180, 110, 430);
+  blobA.addColorStop(0, "rgba(238,241,247, 0.03)");
+  blobA.addColorStop(1, "rgba(238,241,247, 0)");
+  ctx.fillStyle = blobA;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  const blobB = ctx.createRadialGradient(850, 560, 20, 850, 560, 470);
+  blobB.addColorStop(0, "rgba(75,99,148, 0.10)");
+  blobB.addColorStop(1, "rgba(75,99,148, 0)");
+  ctx.fillStyle = blobB;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  /*
+   * Сетка с медленным дыханием.
+   */
+  const gridAlpha = 0.016 + 0.006 * Math.sin(t * 0.8);
+  ctx.strokeStyle = `rgba(116,196,118, ${gridAlpha.toFixed(3)})`;
 
   ctx.lineWidth = 1;
 
@@ -2496,11 +3294,9 @@ function drawBackground() {
   }
 
   /*
-   * Декоративные точки.
+   * Мерцающие точки-звёзды.
    */
-  ctx.fillStyle =
-      "rgba(100, 220, 255, 0.18)";
-
+  let dotIndex = 0;
   for (
       let x = 20;
       x < GAME_WIDTH;
@@ -2511,17 +3307,32 @@ function drawBackground() {
         y < GAME_HEIGHT;
         y += 80
     ) {
+      const tw = 0.5 + 0.5 * Math.sin(t * 1.7 + dotIndex * 1.31 + x * 0.013);
+      ctx.fillStyle = `rgba(238,241,247, ${(0.012 + tw * 0.035).toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(
           x,
           y,
-          1.5,
+          1.2 + tw * 0.9,
           0,
           Math.PI * 2
       );
       ctx.fill();
+      dotIndex++;
     }
   }
+
+  /*
+   * Виньетка — фокус на центр поля.
+   */
+  const vignette = ctx.createRadialGradient(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_HEIGHT * 0.42,
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH * 0.68
+  );
+  vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+  vignette.addColorStop(1, "rgba(5,7,13, 0.55)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 }
 
 
@@ -2530,89 +3341,69 @@ function drawBackground() {
 ========================================================= */
 
 function drawRoad() {
-  /*
-   * Внешнее свечение.
-   */
+  const t = performance.now() / 1000;
+
   ctx.save();
 
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  ctx.strokeStyle =
-      "rgba(40, 220, 255, 0.12)";
+  const tracePath = () => {
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i].x, path[i].y);
+    }
+  };
 
-  ctx.lineWidth = 92;
+  /*
+   * Дорога в языке «Commons»: глубина светом и тенью, без glow.
+   * 1) мягкая cast-тень под полотном; 2) кремовая волосяная кромка;
+   * 3) асфальт темнее фона; 4) утопленный жёлоб; 5) бегущая разметка.
+   */
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
-  ctx.beginPath();
+  ctx.strokeStyle = "rgba(5,7,13, 0.55)";
+  ctx.lineWidth = 84;
+  tracePath();
+  ctx.stroke();
 
-  ctx.moveTo(
-      path[0].x,
-      path[0].y
-  );
-
-  for (let i = 1; i < path.length; i++) {
-    ctx.lineTo(
-        path[i].x,
-        path[i].y
-    );
-  }
-
+  ctx.strokeStyle = "rgba(238,241,247, 0.15)";
+  ctx.lineWidth = 76;
+  tracePath();
   ctx.stroke();
 
   /*
    * Основная дорога.
    */
-  ctx.strokeStyle =
-      "#142d42";
-
+  ctx.strokeStyle = "#191e30";
   ctx.lineWidth = 72;
-
-  ctx.beginPath();
-
-  ctx.moveTo(
-      path[0].x,
-      path[0].y
-  );
-
-  for (let i = 1; i < path.length; i++) {
-    ctx.lineTo(
-        path[i].x,
-        path[i].y
-    );
-  }
-
+  tracePath();
   ctx.stroke();
 
   /*
-   * Светящаяся линия.
+   * Тёмная внутренняя дорожка — объём полотна.
    */
-  ctx.strokeStyle =
-      "rgba(79, 220, 255, 0.5)";
+  ctx.strokeStyle = "rgba(9,11,20, 0.5)";
+  ctx.lineWidth = 44;
+  tracePath();
+  ctx.stroke();
 
+  /*
+   * Бегущая разметка: куда катит поток.
+   */
+  ctx.strokeStyle = "rgba(238,199,110, 0.4)";
   ctx.lineWidth = 2;
-
-  ctx.setLineDash([
-    10,
-    10
-  ]);
-
-  ctx.beginPath();
-
-  ctx.moveTo(
-      path[0].x,
-      path[0].y
-  );
-
-  for (let i = 1; i < path.length; i++) {
-    ctx.lineTo(
-        path[i].x,
-        path[i].y
-    );
-  }
-
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+  ctx.setLineDash([12, 20]);
+  ctx.lineDashOffset = -t * 52;
+  tracePath();
   ctx.stroke();
 
   ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
 
   ctx.restore();
 }
@@ -2625,61 +3416,94 @@ function drawRoad() {
 function drawCore() {
   const core =
       path[path.length - 1];
+  if (!core) return;
+
+  // Анимированный неоновый реактор в конце дороги.
+  const t = performance.now() / 1000;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2.6);
+  const cx = core.x;
+  const cy = core.y;
 
   ctx.save();
 
-  ctx.shadowBlur = 25;
-  ctx.shadowColor =
-      "#ff5577";
-
-  ctx.fillStyle =
-      "rgba(255, 70, 110, 0.2)";
-
+  // Внешнее энергетическое свечение.
+  const halo = ctx.createRadialGradient(cx, cy, 6, cx, cy, 52 + pulse * 8);
+  halo.addColorStop(0, "rgba(223,106,95, 0.40)");
+  halo.addColorStop(0.45, "rgba(223,106,95, 0.16)");
+  halo.addColorStop(1, "rgba(223,106,95, 0)");
+  ctx.fillStyle = halo;
   ctx.beginPath();
-
-  ctx.arc(
-      core.x - 5,
-      core.y,
-      30,
-      0,
-      Math.PI * 2
-  );
-
+  ctx.arc(cx, cy, 52 + pulse * 8, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.shadowBlur = 0;
-
-  ctx.strokeStyle =
-      "#ff5577";
-
-  ctx.lineWidth = 3;
-
+  // Тёмная посадочная чаша.
+  ctx.fillStyle = "rgba(10,13,22, 0.92)";
   ctx.beginPath();
+  ctx.arc(cx, cy, 33, 0, Math.PI * 2);
+  ctx.fill();
 
-  ctx.arc(
-      core.x - 5,
-      core.y,
-      18,
-      0,
-      Math.PI * 2
-  );
+  // Вращающаяся насечка внешней защиты.
+  ctx.save();
+  ctx.strokeStyle = "rgba(223,106,95, 0.55)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([24, 58]);
+  ctx.lineDashOffset = -t * 40;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 41, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 
+  // Основное кольцо корпуса.
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "#df6a5f";
+  ctx.strokeStyle = "#df6a5f";
+  ctx.lineWidth = 3.4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 32, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.fillStyle =
-      "#ff5577";
-
+  // Пульсирующее внутреннее кольцо.
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(207,142,151, 0.85)";
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
+  ctx.arc(cx, cy, 23 + pulse * 2.4, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
 
-  ctx.arc(
-      core.x - 5,
-      core.y,
-      7,
-      0,
-      Math.PI * 2
-  );
+  // Орбитальные искры.
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "#df6a5f";
+  for (let i = 0; i < 3; i++) {
+    const angle = t * 1.9 + (i * Math.PI * 2) / 3;
+    const radius = 27 + Math.sin(t * 3 + i * 2) * 3;
+    ctx.fillStyle = "rgba(246,248,252, 0.9)";
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
 
+  // Раскалённое ядро.
+  const heart = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 14 + pulse * 3);
+  heart.addColorStop(0, "#f6f8fc");
+  heart.addColorStop(0.35, "#df6a5f");
+  heart.addColorStop(0.75, "#6e2f36");
+  heart.addColorStop(1, "rgba(26,17,34, 0.9)");
+  ctx.fillStyle = heart;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "#df6a5f";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 12.5 + pulse * 2.2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Подпись.
+  ctx.fillStyle = "rgba(207,142,151, 0.55)";
+  ctx.font = "700 10px 'JetBrains Mono', Consolas, ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("CORE", cx, cy + 52);
+  ctx.textAlign = "left";
 
   ctx.restore();
 }
@@ -2705,7 +3529,7 @@ function drawComboLinks(groups) {
     const type = towerTypes[group[0].type];
     ctx.strokeStyle = type.color;
     ctx.shadowColor = type.color;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = pulse;
 
     // Соединяем все башни группы. Это также работает для цепных групп,
@@ -2743,7 +3567,7 @@ function drawTower(tower) {
     ctx.save();
     ctx.globalAlpha = 0.35 + 0.15 * Math.sin(performance.now() / 180);
     ctx.strokeStyle = type.color;
-    ctx.shadowBlur = 14;
+    ctx.shadowBlur = 0;
     ctx.shadowColor = type.color;
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 6]);
@@ -2763,18 +3587,32 @@ function drawTower(tower) {
     ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
   }
 
-  ctx.shadowBlur =
-      selected ? 34 : 14;
+  const t = performance.now() / 1000;
+  const phase = (tower.x * 0.013 + tower.y * 0.017) % (Math.PI * 2);
+  const pulse = 0.5 + 0.5 * Math.sin(t * 3 + phase);
+
+  const hexPath = (radius) => {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = -Math.PI / 2 + i * Math.PI / 3;
+      const px = tower.x + Math.cos(angle) * radius;
+      const py = tower.y + Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  };
+
+  ctx.shadowBlur = 0;
 
   ctx.shadowColor =
       type.color;
 
-  if (selected) {
-    ctx.globalAlpha = 1;
-  }
-
+  /*
+   * Общая база: шестигранный пьедестал с внутренней плитой.
+   */
   ctx.fillStyle =
-      "#0d1826";
+      "#191e30";
 
   ctx.strokeStyle =
       type.color;
@@ -2782,148 +3620,399 @@ function drawTower(tower) {
   ctx.lineWidth =
       selected ? 3 : 2;
 
-  /*
-   * Разные формы башен.
-   */
-  if (tower.type === "rail") {
-    ctx.beginPath();
-
-    ctx.moveTo(
-        tower.x - 18,
-        tower.y + 12
-    );
-
-    ctx.lineTo(
-        tower.x + 12,
-        tower.y - 18
-    );
-
-    ctx.lineTo(
-        tower.x + 20,
-        tower.y - 10
-    );
-
-    ctx.lineTo(
-        tower.x - 10,
-        tower.y + 20
-    );
-
-    ctx.closePath();
-
-    ctx.fill();
-    ctx.stroke();
-  } else if (tower.type === "blast") {
-    ctx.beginPath();
-
-    for (let i = 0; i < 8; i++) {
-      const angle =
-          i *
-          Math.PI /
-          4;
-
-      const radius =
-          i % 2 === 0
-              ? 22
-              : 12;
-
-      const x =
-          tower.x +
-          Math.cos(angle) *
-          radius;
-
-      const y =
-          tower.y +
-          Math.sin(angle) *
-          radius;
-
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-
-    ctx.closePath();
-
-    ctx.fill();
-    ctx.stroke();
-  } else if (tower.type === "singularity") {
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 13, 0, Math.PI * 2);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = type.color;
-    ctx.beginPath();
-    ctx.arc(tower.x, tower.y, 5, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (tower.type === "arc") {
-    ctx.beginPath();
-
-    ctx.moveTo(
-        tower.x,
-        tower.y - 22
-    );
-
-    ctx.lineTo(
-        tower.x + 15,
-        tower.y + 16
-    );
-
-    ctx.lineTo(
-        tower.x - 15,
-        tower.y + 16
-    );
-
-    ctx.closePath();
-
-    ctx.fill();
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-
-    ctx.arc(
-        tower.x,
-        tower.y,
-        20,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  ctx.shadowBlur = 0;
-
-  /*
-   * Центральная точка жизней.
-   */
-  ctx.fillStyle =
-      type.color;
-
-  ctx.beginPath();
-
-  ctx.arc(
-      tower.x,
-      tower.y,
-      6,
-      0,
-      Math.PI * 2
-  );
-
+  hexPath(22);
   ctx.fill();
+  ctx.stroke();
 
+  ctx.save();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = type.color;
+  hexPath(15.5);
+  ctx.stroke();
   ctx.restore();
 
+  /*
+   * Турель: ствол наведён на последнюю цель («кинетические» башни).
+   */
+  const hasBarrel =
+      tower.type === "rail" ||
+      tower.type === "titan" ||
+      tower.type === "nova" ||
+      tower.type === "devastator";
 
+  if (hasBarrel) {
+    const angle = typeof tower.aimAngle === "number" ? tower.aimAngle : -Math.PI / 2;
+    const barrelLength = tower.type === "rail" ? 34 : tower.type === "devastator" ? 28 : 22;
+    const barrelHalf = tower.type === "devastator" ? 6 : tower.type === "rail" ? 3.4 : 4.4;
 
+    ctx.save();
+    ctx.translate(tower.x, tower.y);
+    ctx.rotate(angle);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#1f2638";
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.rect(4, -barrelHalf, barrelLength, barrelHalf * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    if (tower.type === "rail") {
+      // Рельсотрон: две направляющие шины.
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(7, -barrelHalf + 1.5);
+      ctx.lineTo(4 + barrelLength - 4, -barrelHalf + 1.5);
+      ctx.moveTo(7, barrelHalf - 1.5);
+      ctx.lineTo(4 + barrelLength - 4, barrelHalf - 1.5);
+      ctx.stroke();
+    } else if (tower.type === "devastator") {
+      // Опустошитель: бронзовое утолщение ствола.
+      ctx.fillStyle = "rgba(207,142,151, 0.45)";
+      ctx.beginPath();
+      ctx.rect(4 + barrelLength * 0.4, -barrelHalf - 1.5, 5, barrelHalf * 2 + 3);
+      ctx.fill();
+    }
+
+    // Срез ствола.
+    ctx.fillStyle = type.color;
+    ctx.beginPath();
+    ctx.rect(4 + barrelLength - 6, -barrelHalf + 1.2, 6, barrelHalf * 2 - 2.4);
+    ctx.fill();
+
+    // Вспышка сразу после выстрела.
+    if (tower.muzzleFlash > 0) {
+      const flash = tower.muzzleFlash / 0.12;
+      ctx.globalAlpha = flash;
+      ctx.fillStyle = "#eef1f7";
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = type.color;
+      ctx.beginPath();
+      ctx.arc(4 + barrelLength + 3, 0, 3 + flash * 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  /*
+   * Надстройка конкретного типа.
+   */
+  ctx.strokeStyle = type.color;
+  ctx.fillStyle = type.color;
+
+  if (isSupportType(tower.type)) {
+    // Модуль поддержки: энергетический конденсатор с орбитами.
+    const cap = ctx.createRadialGradient(tower.x, tower.y, 1, tower.x, tower.y, 11);
+    cap.addColorStop(0, "#eef1f7");
+    cap.addColorStop(0.45, type.color);
+    cap.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = cap;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = type.color;
+    for (let i = 0; i < 2; i++) {
+      const orbit = t * 2.2 + i * Math.PI;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(tower.x + Math.cos(orbit) * 17, tower.y + Math.sin(orbit) * 17, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Тонкое кольцо зоны усиления (раньше жило в мёртвом коде и не рисовалось).
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.16;
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([6, 9]);
+    ctx.lineDashOffset = -t * 12;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, type.range, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  } else if (tower.type === "pulse") {
+    // Импульс: реактор с силовыми контактами.
+    const coreGradient = ctx.createRadialGradient(
+        tower.x, tower.y, 1,
+        tower.x, tower.y, 12
+    );
+    coreGradient.addColorStop(0, "#f6f8fc");
+    coreGradient.addColorStop(0.35, type.color);
+    coreGradient.addColorStop(1, "rgba(238,241,247, 0)");
+    ctx.fillStyle = coreGradient;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#eef1f7";
+    ctx.lineWidth = 1.4;
+    ctx.globalAlpha = 0.8;
+    ctx.setLineDash([5, 7]);
+    ctx.lineDashOffset = -t * 26;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 17.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = type.color;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    for (let i = 0; i < 4; i++) {
+      const contact = i * Math.PI / 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.arc(
+          tower.x + Math.cos(contact) * 13.5,
+          tower.y + Math.sin(contact) * 13.5,
+          2.1,
+          0,
+          Math.PI * 2
+      );
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#eef1f7";
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 2.8 + pulse * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  } else if (tower.type === "frost") {
+    // Криоузел: вращающийся ледяной кристалл из трёх пластин.
+    ctx.save();
+    ctx.translate(tower.x, tower.y);
+    ctx.rotate(t * 0.6);
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 1.8;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    for (let i = 0; i < 3; i++) {
+      ctx.rotate(Math.PI / 3);
+      ctx.fillStyle = "rgba(164,220,184, 0.14)";
+      ctx.beginPath();
+      ctx.moveTo(0, -17);
+      ctx.lineTo(4.4, 0);
+      ctx.lineTo(0, 17);
+      ctx.lineTo(-4.4, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#eef1f7";
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.8 + pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.shadowBlur = 0;
+  } else if (tower.type === "blast") {
+    // Разлом: мортира с вращающимися снарядами.
+    ctx.fillStyle = "#10141f";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const muzzle = ctx.createRadialGradient(tower.x, tower.y, 1, tower.x, tower.y, 7);
+    muzzle.addColorStop(0, "#e8a04c");
+    muzzle.addColorStop(0.5, type.color);
+    muzzle.addColorStop(1, "rgba(223,106,95, 0)");
+    ctx.fillStyle = muzzle;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = type.color;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    for (let i = 0; i < 3; i++) {
+      const shell = -t * 1.6 + i * (Math.PI * 2 / 3);
+      ctx.beginPath();
+      ctx.arc(
+          tower.x + Math.cos(shell) * 16.5,
+          tower.y + Math.sin(shell) * 16.5,
+          2.2,
+          0,
+          Math.PI * 2
+      );
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  } else if (tower.type === "arc") {
+    // Дуга: телескоп-катушка с живым разрядом между рогами.
+    ctx.fillStyle = "#191e30";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y - 7, 6.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(tower.x - 8, tower.y + 13);
+    ctx.lineTo(tower.x, tower.y - 1);
+    ctx.lineTo(tower.x + 8, tower.y + 13);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#e8b64c";
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "#e8b64c";
+    ctx.lineWidth = 1.4;
+    ctx.globalAlpha = 0.45 + pulse * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(tower.x - 8, tower.y + 13);
+    ctx.lineTo(tower.x + (Math.random() - 0.5) * 9, tower.y + 5 + (Math.random() - 0.5) * 6);
+    ctx.lineTo(tower.x + 8, tower.y + 13);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#eef1f7";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y - 7, 1.8 + pulse, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (tower.type === "titan") {
+    // Титан: броневые клёпки по ребрам и реактивное сопло.
+    ctx.fillStyle = type.color;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    for (let i = 0; i < 6; i++) {
+      const rivet = -Math.PI / 2 + i * Math.PI / 3;
+      ctx.beginPath();
+      ctx.arc(
+          tower.x + Math.cos(rivet) * 18,
+          tower.y + Math.sin(rivet) * 18,
+          1.7,
+          0,
+          Math.PI * 2
+      );
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#273049";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    ctx.fillStyle = "#e08b52";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 3 + pulse * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (tower.type === "nova") {
+    // Нова: стабилизирующее кольцо вокруг плазменной сферы.
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = type.color;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    ctx.setLineDash([10, 8]);
+    ctx.lineDashOffset = t * 30;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 19, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    const novaOrb = ctx.createRadialGradient(tower.x, tower.y, 1, tower.x, tower.y, 9);
+    novaOrb.addColorStop(0, "#eef1f7");
+    novaOrb.addColorStop(0.5, type.color);
+    novaOrb.addColorStop(1, "rgba(116,196,118, 0)");
+    ctx.fillStyle = novaOrb;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 9, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (tower.type === "devastator") {
+    // Опустошитель: сигнальное кольцо опасности.
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = "#df6a5f";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 7]);
+    ctx.lineDashOffset = -t * 34;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 25.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = "#151226";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 8.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    ctx.fillStyle = "#cf8e97";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 3.2 + pulse * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (tower.type === "singularity") {
+    // Нуль-коллайдер: горизонт событий и аккреционный диск.
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([14, 22]);
+    ctx.lineDashOffset = -t * 60;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 27, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = "#0d1018";
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#eef1f7";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 11, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(tower.x, tower.y);
+    ctx.rotate(t * 1.4);
+    ctx.strokeStyle = type.color;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = type.color;
+    ctx.lineWidth = 2.4;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0.3, Math.PI * 1.25);
+    ctx.stroke();
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.5, Math.PI + 0.4, Math.PI * 2.1);
+    ctx.stroke();
+    ctx.restore();
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.beginPath();
+    ctx.arc(tower.x, tower.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = type.color;
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
-
 
 /* =========================================================
    ВРАГИ
@@ -2934,31 +4023,74 @@ function drawEnemy(enemy) {
 
   const hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
   const type = enemy.enemyType || getEnemyType(enemy.waveNumber);
+  const r = enemy.radius;
+  const t = performance.now() / 1000;
+  const flick = 0.5 + 0.5 * Math.sin(t * 17 + enemy.distance * 0.3);
+
+  // Нос корабля смотрит вдоль маршрута (плавный доворот).
+  const ahead = getPointOnPath(Math.min(enemy.distance + 6, PATH_LENGTH));
+  const want = Math.atan2(ahead.y - enemy.y, ahead.x - enemy.x);
+  if (typeof enemy.angle !== "number" || !Number.isFinite(enemy.angle)) {
+    enemy.angle = want;
+  } else {
+    let diff = want - enemy.angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    enemy.angle += diff * 0.18;
+  }
 
   ctx.save();
-  ctx.shadowBlur = 14;
+  ctx.translate(enemy.x, enemy.y);
+  ctx.rotate(enemy.angle);
+  ctx.shadowBlur = 0;
   ctx.shadowColor = type.glow;
-  ctx.fillStyle = "#20111d";
-  ctx.strokeStyle = type.color;
-  ctx.lineWidth = 2;
-  drawEnemyShape(enemy.x, enemy.y, enemy.radius, type.shape);
+
+  // Пламя двигателя за кормой.
+  const flame = ctx.createLinearGradient(-r * 2.1, 0, -r * 0.3, 0);
+  flame.addColorStop(0, "rgba(255, 255, 255, 0)");
+  flame.addColorStop(1, type.glow);
+  ctx.globalAlpha = 0.45 + 0.4 * flick;
+  ctx.fillStyle = flame;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.35, -r * 0.4);
+  ctx.lineTo(-r * (1.55 + flick * 0.6), 0);
+  ctx.lineTo(-r * 0.35, r * 0.4);
+  ctx.closePath();
   ctx.fill();
-  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  drawEnemyShipHull(type.shape, r, type.color);
+  ctx.restore();
+
+  ctx.save();
   ctx.shadowBlur = 0;
 
-  ctx.fillStyle = type.color;
-  ctx.beginPath();
-  ctx.arc(enemy.x, enemy.y, 3.5, 0, Math.PI * 2);
-  ctx.fill();
+  // Заморозка: крутящееся ледяное кольцо.
+  if (enemy.slowTimer > 0) {
+    ctx.strokeStyle = "rgba(164,220,184, 0.75)";
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([4, 5]);
+    ctx.lineDashOffset = performance.now() / 60;
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, enemy.radius + 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
-  const barWidth = 30, barHeight = 4;
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(enemy.x - barWidth / 2, enemy.y - 23, barWidth, barHeight);
-  ctx.fillStyle = type.color;
-  ctx.fillRect(enemy.x - barWidth / 2, enemy.y - 23, barWidth * hpPercent, barHeight);
+  // HP-бар: цвет зависит от остатка здоровья.
+  const barWidth = Math.max(24, enemy.radius * 2.4);
+  const barHeight = 4;
+  const barX = enemy.x - barWidth / 2;
+  const barY = enemy.y - enemy.radius - 14;
+  const hpColor =
+      hpPercent > 0.5 ? "#74c476" :
+      hpPercent > 0.25 ? "#e8a04c" : "#c9504f";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+  ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+  ctx.fillStyle = hpColor;
+  ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
   ctx.restore();
 }
-
 
 /* =========================================================
    СНАРЯДЫ
@@ -2967,23 +4099,38 @@ function drawEnemy(enemy) {
 function drawProjectile(projectile) {
   ctx.save();
 
-  ctx.shadowBlur = 15;
+  const target = projectile.target;
+  if (target && !target.dead) {
+    projectile.angle = Math.atan2(target.y - projectile.y, target.x - projectile.x);
+  }
+  const angle = projectile.angle || 0;
+
+  ctx.translate(projectile.x, projectile.y);
+  ctx.rotate(angle);
+
+  ctx.shadowBlur = 0;
   ctx.shadowColor =
       projectile.color;
 
   ctx.fillStyle =
       projectile.color;
 
+  // Светящийся хвост.
+  ctx.globalAlpha = 0.32;
   ctx.beginPath();
+  ctx.ellipse(-9, 0, 11, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
 
-  ctx.arc(
-      projectile.x,
-      projectile.y,
-      4,
-      0,
-      Math.PI * 2
-  );
+  // Тело снаряда.
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 6, 3.4, 0, 0, Math.PI * 2);
+  ctx.fill();
 
+  // Белая сердцевина.
+  ctx.fillStyle = "#eef1f7";
+  ctx.beginPath();
+  ctx.arc(2.2, 0, 1.8, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -3012,12 +4159,13 @@ function drawEffects() {
       ctx.strokeStyle =
           effect.color;
 
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 1 + 3 * alpha;
 
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 0;
       ctx.shadowColor =
           effect.color;
 
+      // Основная ударная волна.
       ctx.beginPath();
 
       ctx.arc(
@@ -3029,6 +4177,25 @@ function drawEffects() {
       );
 
       ctx.stroke();
+
+      // Внутреннее кольцо.
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.radius * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Белая вспышка в центре.
+      const flashR = effect.maxRadius * 0.6;
+      if (flashR > 1) {
+        const flash = ctx.createRadialGradient(effect.x, effect.y, 1, effect.x, effect.y, flashR);
+        flash.addColorStop(0, "rgba(255, 255, 255, " + (0.35 * alpha).toFixed(3) + ")");
+        flash.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = flash;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, flashR, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     if (
@@ -3039,50 +4206,50 @@ function drawEffects() {
           alpha;
 
       ctx.strokeStyle =
-          "#fff6a0";
+          "#e8b64c";
 
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 0;
       ctx.shadowColor =
-          "#ffe66d";
+          "#e8b64c";
 
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
+
+      // Живой зигзаг с дёрганием на каждом кадре.
+      const dx = effect.x2 - effect.x1;
+      const dy = effect.y2 - effect.y1;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
 
       ctx.beginPath();
+      ctx.moveTo(effect.x1, effect.y1);
+      for (let s = 1; s < 4; s++) {
+        const p = s / 4;
+        const jitter = (Math.random() - 0.5) * Math.min(26, len * 0.22);
+        ctx.lineTo(
+            effect.x1 + dx * p + nx * jitter,
+            effect.y1 + dy * p + ny * jitter
+        );
+      }
+      ctx.lineTo(effect.x2, effect.y2);
+      ctx.stroke();
 
-      ctx.moveTo(
-          effect.x1,
-          effect.y1
-      );
-
-      const midX =
-          (effect.x1 +
-              effect.x2) /
-          2;
-
-      const midY =
-          (effect.y1 +
-              effect.y2) /
-          2;
-
-      ctx.lineTo(
-          midX + 10,
-          midY - 10
-      );
-
-      ctx.lineTo(
-          effect.x2,
-          effect.y2
-      );
-
+      // Тонкая параллельная ветка.
+      ctx.globalAlpha = alpha * 0.5;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(effect.x1, effect.y1);
+      ctx.lineTo(effect.x1 + dx * 0.5 + nx * 12, effect.y1 + dy * 0.5 + ny * 12);
+      ctx.lineTo(effect.x2, effect.y2);
       ctx.stroke();
     }
 
     if (effect.type === "place") {
       ctx.globalAlpha = Math.max(0, effect.life / effect.maxLife);
       const progress = 1 - effect.life / effect.maxLife;
-      ctx.strokeStyle = effect.color || "#63e6ff";
+      ctx.strokeStyle = effect.color || "#74c476";
       ctx.lineWidth = 3;
-      ctx.shadowBlur = 18; ctx.shadowColor = effect.color || "#63e6ff";
+      ctx.shadowBlur = 0; ctx.shadowColor = effect.color || "#74c476";
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, 10 + progress * 30, 0, Math.PI * 2);
       ctx.stroke();
@@ -3090,13 +4257,69 @@ function drawEffects() {
 
     if (effect.type === "cash") {
       ctx.globalAlpha = alpha;
-      ctx.font = "800 16px Inter, system-ui, sans-serif";
+      ctx.translate(effect.x, effect.y);
+      const pop = 1 + 0.22 * Math.pow(alpha, 3);
+      ctx.scale(pop, pop);
+      ctx.font = "800 16px 'JetBrains Mono', Consolas, ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#ffd36a";
-      ctx.shadowBlur = 12;
-      ctx.shadowColor = "#ffb52e";
-      ctx.fillText(`+$${effect.amount}`, effect.x, effect.y);
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = "rgba(9,11,20, 0.85)";
+      ctx.strokeText(`+$${effect.amount}`, 0, 0);
+      ctx.fillStyle = "#e8a04c";
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = "#e08b52";
+      ctx.fillText(`+$${effect.amount}`, 0, 0);
+    }
+
+    // Комбо-взрыв раньше вообще не рисовался — теперь виден.
+    if (effect.type === "comboBurst") {
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = effect.color;
+      ctx.lineWidth = 2 + 5 * alpha;
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = effect.color;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const burstFill = ctx.createRadialGradient(
+          effect.x, effect.y, 2,
+          effect.x, effect.y, Math.max(4, effect.radius)
+      );
+      burstFill.addColorStop(0, "rgba(255, 255, 255, " + (0.30 * alpha).toFixed(3) + ")");
+      burstFill.addColorStop(1, "rgba(255, 255, 255, 0)");
+      ctx.fillStyle = burstFill;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Установка мины: пунктирное кольцо, сжимающееся к точке.
+    if (effect.type === "minePlace") {
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = effect.color || "#74c476";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = effect.color || "#74c476";
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Красная пульсация краёв при потере жизни.
+    if (effect.type === "leakFlash") {
+      const a = alpha;
+      const leakVignette = ctx.createRadialGradient(
+          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_HEIGHT * 0.36,
+          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH * 0.62
+      );
+      leakVignette.addColorStop(0, "rgba(201,80,79, 0)");
+      leakVignette.addColorStop(1, "rgba(201,80,79, " + (0.4 * a).toFixed(3) + ")");
+      ctx.fillStyle = leakVignette;
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     }
 
     ctx.restore();
@@ -3109,9 +4332,10 @@ function drawTowerUpgradeVisual(tower, type) {
   const rangeLevel = tower.rangeLevel || 1;
   const speedLevel = tower.speedLevel || 1;
   const levels = [damageLevel, rangeLevel, speedLevel];
-  const colors = ["#ff4055", "#ffd43b", "#35d9ff"];
+  const kindNames = ["damage", "range", "speed"];
+  const colors = ["#df6a5f", "#e8a04c", "#eec76a"];
   const selected = tower === state.selectedTower;
-  const allMax = levels.every(level => level >= MAX_UPGRADE_LEVEL);
+  const allMax = kindNames.every(kind => isStatMaxed(tower, kind));
   const comboReady = (state.comboReadyTowers && state.comboReadyTowers.has(tower)) || false;
 
   ctx.save();
@@ -3124,9 +4348,9 @@ function drawTowerUpgradeVisual(tower, type) {
         tower.x, tower.y, 2,
         tower.x, tower.y, 25
     );
-    greenGlow.addColorStop(0, "rgba(90, 255, 130, 0.95)");
-    greenGlow.addColorStop(0.55, "rgba(40, 220, 100, 0.72)");
-    greenGlow.addColorStop(1, "rgba(40, 220, 100, 0)");
+    greenGlow.addColorStop(0, "rgba(116,196,118, 0.95)");
+    greenGlow.addColorStop(0.55, "rgba(116,196,118, 0.72)");
+    greenGlow.addColorStop(1, "rgba(116,196,118, 0)");
 
     ctx.fillStyle = greenGlow;
     ctx.fillRect(tower.x - 25, tower.y - 25, 50, 50);
@@ -3138,7 +4362,7 @@ function drawTowerUpgradeVisual(tower, type) {
     ];
 
     levels.forEach((level, index) => {
-      const progress = (level - 1) / (MAX_UPGRADE_LEVEL - 1);
+      const progress = (level - 1) / (statMaxLevel(tower.type, kindNames[index]) - 1);
       if (progress <= 0) {
         return;
       }
@@ -3166,9 +4390,9 @@ function drawTowerUpgradeVisual(tower, type) {
       const distanceFromCenter = 13;
       const x = tower.x + Math.cos(angle) * distanceFromCenter;
       const y = tower.y + Math.sin(angle) * distanceFromCenter;
-      const progress = clamp(level / MAX_UPGRADE_LEVEL, 0.2, 1);
+      const progress = clamp(level / statMaxLevel(tower.type, kindNames[index]), 0.2, 1);
 
-      ctx.shadowBlur = selected ? 10 : 6;
+      ctx.shadowBlur = 0;
       ctx.shadowColor = colors[index];
       ctx.fillStyle = colors[index];
       ctx.globalAlpha = 0.35 + progress * 0.65;
@@ -3177,9 +4401,9 @@ function drawTowerUpgradeVisual(tower, type) {
       ctx.fill();
     });
   } else {
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = "#5cff8d";
-    ctx.fillStyle = "#5cff8d";
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "#74c476";
+    ctx.fillStyle = "#74c476";
     ctx.globalAlpha = 0.95;
     ctx.beginPath();
     ctx.arc(tower.x, tower.y, 7, 0, Math.PI * 2);
@@ -3191,17 +4415,18 @@ function drawTowerUpgradeVisual(tower, type) {
 
 function drawRangeUpgradePreview(tower, type) {
   const rangeLevel = tower.rangeLevel || 1;
-  if (rangeLevel >= MAX_UPGRADE_LEVEL) return;
+  if (isStatMaxed(tower, "range")) return;
 
   const stats = getTowerStats(tower);
   const currentRange = stats.range;
-  const nextRange = type.range + rangeLevel * 15;
+  const support = getSupportBonus(tower);
+  const nextRange = tierValue(tower.type, "range", rangeLevel + 1) * (1 + support.rangePct) + support.rangeFlat;
 
   ctx.save();
 
   // Текущий радиус — тонкий спокойный контур.
   ctx.globalAlpha = 0.18;
-  ctx.strokeStyle = '#ffd43b';
+  ctx.strokeStyle = '#e8a04c';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(tower.x, tower.y, currentRange, 0, Math.PI * 2);
@@ -3209,7 +4434,7 @@ function drawRangeUpgradePreview(tower, type) {
 
   // Новый радиус — яркий пунктир, чтобы сразу видеть прибавку.
   ctx.globalAlpha = 0.75;
-  ctx.strokeStyle = '#fff0a6';
+  ctx.strokeStyle = '#e8a04c';
   ctx.lineWidth = 2.5;
   ctx.setLineDash([8, 7]);
   ctx.beginPath();
@@ -3219,7 +4444,7 @@ function drawRangeUpgradePreview(tower, type) {
 
   // Лёгкая подсветка только дополнительной области.
   ctx.globalAlpha = 0.055;
-  ctx.fillStyle = '#ffd43b';
+  ctx.fillStyle = '#e8a04c';
   ctx.beginPath();
   ctx.arc(tower.x, tower.y, nextRange, 0, Math.PI * 2);
   ctx.arc(tower.x, tower.y, currentRange, 0, Math.PI * 2, true);
@@ -3248,7 +4473,7 @@ function drawPlacementPreview() {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = type.color;
-  ctx.strokeStyle = valid ? type.color : "#ff5577";
+  ctx.strokeStyle = valid ? type.color : "#c9504f";
   ctx.lineWidth = 2;
 
   ctx.beginPath();
@@ -3261,7 +4486,7 @@ function drawPlacementPreview() {
   ctx.arc(x, y, type.range, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = valid ? type.color : "#ff5577";
+  ctx.strokeStyle = valid ? type.color : "#c9504f";
   ctx.beginPath();
   ctx.arc(x, y, type.range, 0, Math.PI * 2);
   ctx.stroke();
@@ -3277,9 +4502,9 @@ function drawFallbackField() {
   // отрисовки оказался повреждён. Это не вмешивается в симуляцию.
   ctx.save();
   ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-  ctx.fillStyle = '#07101b';
+  ctx.fillStyle = '#151a2b';
   ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-  ctx.strokeStyle = 'rgba(80, 180, 255, 0.07)';
+  ctx.strokeStyle = 'rgba(116,196,118, 0.07)';
   ctx.lineWidth = 1;
   for (let x = 0; x <= GAME_WIDTH; x += 40) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GAME_HEIGHT); ctx.stroke();
@@ -3288,7 +4513,7 @@ function drawFallbackField() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(GAME_WIDTH, y); ctx.stroke();
   }
   if (Array.isArray(path) && path.length > 1) {
-    ctx.strokeStyle = 'rgba(40, 220, 255, 0.20)';
+    ctx.strokeStyle = 'rgba(116,196,118, 0.20)';
     ctx.lineWidth = 72;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -3333,17 +4558,17 @@ function draw() {
       ctx.globalAlpha = 0.32 * alpha;
       ctx.strokeStyle = projectile.color;
       ctx.lineWidth = 3;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 0;
       ctx.shadowColor = projectile.color;
       ctx.beginPath();
       ctx.moveTo(projectile.x - nx * 24, projectile.y - ny * 24);
       ctx.lineTo(projectile.x, projectile.y);
       ctx.stroke();
       ctx.globalAlpha = alpha;
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = 0;
       ctx.shadowColor = projectile.color;
       ctx.fillStyle = projectile.color;
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = '#eef1f7';
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(projectile.x, projectile.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.restore();
@@ -3356,9 +4581,9 @@ function draw() {
       const pulse = (Math.sin((mine.pulse || 0) * 5) + 1) * 0.5;
       ctx.save();
       ctx.globalAlpha = lifeAlpha;
-      ctx.shadowBlur = 18;
+      ctx.shadowBlur = 0;
       ctx.shadowColor = mine.color;
-      ctx.fillStyle = '#101827';
+      ctx.fillStyle = '#1f2638';
       ctx.strokeStyle = mine.color;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(mine.x, mine.y, 9 + pulse * 1.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -3466,26 +4691,22 @@ function endGame(win) {
   state.spawning = false;
 
   if (win) {
-    endTitle.textContent =
-        "Победа!";
-
-    endText.textContent =
-        `Все ${state.maxWaves} волн уничтожены. Сбито врагов: ${state.kills}.`;
+    endTitle.textContent = tl("end.victoryTitle");
+    endText.textContent = tl("end.victoryText", { n: state.maxWaves, k: state.kills });
   } else {
     ensureAudio();
     playDefeatSound();
-
-    endTitle.textContent =
-        "Игра окончена";
-
-    endText.textContent =
-        `Жизни закончились. Сбито врагов: ${state.kills}.`;
+    endTitle.textContent = tl("end.gameoverTitle");
+    endText.textContent = tl("end.gameoverText", { k: state.kills });
   }
 
   setGameOverUi(true);
   endModal.classList.remove(
       "hidden"
   );
+
+  // Запрос оценки игры (sdk-review) после завершённой партии.
+  try { window.NeonBridgeYandex && window.NeonBridgeYandex.requestReview && window.NeonBridgeYandex.requestReview(); } catch (e) {}
 }
 
 function selectDifficulty(difficultyId) {
@@ -3626,10 +4847,10 @@ function clearSavedGame() {
 function updateResumeButton() {
   const exists = hasSavedGame();
   if (exists) {
-    startGameBtn.textContent = "Продолжить игру";
+    startGameBtn.textContent = tl("ui.resumeGame");
     newGameBtn?.classList.remove("hidden");
   } else {
-    startGameBtn.textContent = "Новая игра";
+    startGameBtn.textContent = tl("ui.newGame");
     newGameBtn?.classList.add("hidden");
   }
 }
@@ -3686,15 +4907,15 @@ function loadGame() {
     selectDifficulty(currentDifficulty);
     selectMap(currentMap);
     speedBtn.textContent = `x${state.speed}`;
-    pauseBtn.textContent = "Пауза";
+    pauseBtn.textContent = tl("ui.pause");
     pauseOverlay?.classList.add("hidden");
     endModal.classList.add("hidden");
     document.querySelectorAll(".tower-card").forEach(card => {
       card.classList.toggle("active", card.dataset.tower === "pulse");
     });
-    waveNameEl.textContent = state.waveActive ? `Волна ${state.wave}` : "Готовность";
+    waveNameEl.textContent = state.waveActive ? tl("ui.waveName", { n: state.wave }) : tl("ui.ready");
     hasStartedGame = true;
-    setHint("Прогресс восстановлен. Игра продолжается.");
+    setHint(tl("hint.restored"));
     updateUi();
     return true;
   } catch (error) {
@@ -3723,6 +4944,8 @@ function showMainMenu() {
   endModal.classList.add("hidden");
   gameScreen.classList.add("hidden");
   mainMenu.classList.remove("hidden");
+  // Свежесозданные в редакторе карты подхватываются без перезагрузки.
+  renderMapCards();
   updateResumeButton();
 }
 
@@ -3752,6 +4975,8 @@ function startGame() {
   state.lastTime = performance.now();
   mainMenu.classList.add("hidden");
   gameScreen.classList.remove("hidden");
+  // Разметка геймплея для платформы (GameplayAPI.start, п. 1.19.3).
+  try { window.NeonBridgeYandex && window.NeonBridgeYandex.gameplayStart && window.NeonBridgeYandex.gameplayStart(); } catch (e) {}
 }
 
 function startNewGame() {
@@ -3765,13 +4990,14 @@ function startNewGame() {
   state.lastTime = performance.now();
   mainMenu.classList.add("hidden");
   gameScreen.classList.remove("hidden");
+  try { window.NeonBridgeYandex && window.NeonBridgeYandex.gameplayStart && window.NeonBridgeYandex.gameplayStart(); } catch (e) {}
 }
 
 function restartGame() {
   setGameOverUi(false);
   state.sessionId = state.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  state.money = DEV_INFINITE_MONEY ? TEST_MONEY : 170;
-  state.lives = 12;
+  state.money = DEV_INFINITE_MONEY ? TEST_MONEY : 300;
+  state.lives = 10;
 
   state.wave = 0;
   state.kills = 0;
@@ -3813,7 +5039,7 @@ function restartGame() {
   state.comboCheckTimer = 0;
 
   pauseBtn.textContent =
-      "Пауза";
+      tl("ui.pause");
 
   if (pauseOverlay) {
     pauseOverlay.classList.add("hidden");
@@ -3839,10 +5065,10 @@ function restartGame() {
       });
 
   waveNameEl.textContent =
-      "Готовность";
+      tl("ui.ready");
 
   setHint(
-      "Выберите башню справа, затем поставьте её вне дороги."
+      tl("hint.pickTowerStart")
   );
 
   updateUi();
@@ -3853,11 +5079,14 @@ function restartGame() {
    ЗАПУСК
 ========================================================= */
 
+applyDataI18n();
+mergeCustomMaps();
+renderMapCards();
 selectDifficulty(currentDifficulty);
 selectMap(currentMap);
 
 setHint(
-    "Выберите башню справа, затем поставьте её вне дороги."
+    tl("hint.pickTowerStart")
 );
 
 updateUi();

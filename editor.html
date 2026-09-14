@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Редактор карт — Bridge Guardians</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background:
+      radial-gradient(900px 480px at 15% -10%, rgba(116,196,118,.10), transparent 60%),
+      radial-gradient(900px 480px at 95% 110%, rgba(91,159,214,.10), transparent 60%),
+      #090b14;
+    color: #eef1f7;
+    font: 15px/1.45 Inter, system-ui, "Segoe UI", sans-serif;
+  }
+  .editor-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; margin: 0 auto 12px; max-width: 1360px; flex-wrap: wrap;
+  }
+  .editor-title { display: grid; gap: 2px; }
+  .editor-head h1 {
+    margin: 0; font-size: 1.25rem; letter-spacing: .05em; text-transform: uppercase;
+    background: linear-gradient(90deg, #eef1f7, #74c476 45%, #74c476);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter:none;
+  }
+  .editor-head .sub { color: rgba(238,241,247,.54); font-size: .82rem; }
+  .head-actions { display: flex; gap: 8px; align-items: center; }
+  #editorPointCount { color: rgba(238,241,247,.54); font-size: .82rem; align-self: center; margin-right: 4px; }
+
+  .back-link, .play-link {
+    text-decoration: none; font-weight: 800; font-size: .88rem; letter-spacing: .04em;
+    border-radius: 10px; padding: 10px 16px; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .15s ease, box-shadow .15s ease, transform .15s ease; cursor: pointer;
+    border: 1px solid rgba(116,196,118,.45); color: #8fd0e8; background: rgba(116,196,118,.08);
+  }
+  .back-link:hover, .play-link:hover { background: rgba(116,196,118,.18); box-shadow:none; transform: translateY(-1px); }
+  .play-link { border-color: transparent; color: #05070d; background: linear-gradient(180deg, #e8a95d, #d97b45); font-weight: 900; }
+  .play-link:hover { background: linear-gradient(180deg, #eef1f7, #e8a95d); box-shadow:none; }
+
+  .steps {
+    max-width: 1360px; margin: 0 auto 12px; display: flex; flex-wrap: wrap; gap: 10px;
+  }
+  .step {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    border: 1px solid #212840; border-radius: 10px; background: rgba(20,25,40,.7);
+    font-size: .85rem; color: rgba(238,241,247,.72);
+  }
+  .step b {
+    width: 22px; height: 22px; flex: 0 0 22px; display: grid; place-items: center;
+    border-radius: 50%; background: #74c476; color: #05070d; font-size: .8rem; font-weight: 900;
+  }
+
+  .editor-layout {
+    display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 14px; max-width: 1360px; margin: 0 auto; align-items: start;
+  }
+  @media (max-width: 980px) { .editor-layout { grid-template-columns: 1fr; } }
+
+  #editorWrap {
+    border: 1px solid rgba(116,196,118,.28); border-radius: 14px; overflow: hidden;
+    box-shadow:0 18px 60px rgba(0,0,0,.45);
+    background: #0d1018;
+  }
+  #editorCanvas { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tbtn {
+    border: 1px solid #2a3350; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+    background: linear-gradient(180deg, #1e2538, #10141f); color: rgba(238,241,247,.72); font: inherit;
+    font-weight: 700; transition: border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+  }
+  .tbtn:hover { border-color: #74c476; box-shadow:none; transform: translateY(-1px); }
+  .tbtn.active { border-color: #eec76a; background: linear-gradient(180deg, #212a44, #1f2638); }
+  .tbtn.primary { border-color: transparent; color: #05070d; background: linear-gradient(180deg, #e8a95d, #d97b45); font-weight: 900; }
+  .tbtn.primary:hover { background: linear-gradient(180deg, #eef1f7, #e8a95d); }
+  .tbtn.danger { border-color: rgba(223,106,95,.55); color: #cf8e97; background: linear-gradient(180deg, #221836, #1a1330); }
+  .tbtn.danger:hover { border-color: #df6a5f; }
+  .toolbar .divider { flex: 1 1 0; }
+
+  .side {
+    display: grid; gap: 12px;
+    border: 1px solid #212840; border-radius: 14px; padding: 16px;
+    background: linear-gradient(180deg, rgba(13,16,26,.96), rgba(9,11,20,.96));
+    box-shadow: 0 14px 40px rgba(0,0,0,.35);
+  }
+  .side h2 { margin: 0 0 6px; font-size: .76rem; letter-spacing: .14em; text-transform: uppercase; color: rgba(238,241,247,.72); }
+  .side h2::before { content: "— "; color: #74c476; }
+  .side input[type=text] {
+    width: 100%; border: 1px solid #2a3350; border-radius: 9px; padding: 9px 11px;
+    background: #10141f; color: #eef1f7; font: inherit;
+  }
+  .side textarea { font: 12px/1.4 ui-monospace, Consolas, monospace; min-height: 90px; resize: vertical; width: 100%; border: 1px solid #2a3350; border-radius: 9px; padding: 8px 10px; background: #10141f; color: #eef1f7; }
+  .field { display: grid; gap: 5px; }
+  .field label { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: rgba(238,241,247,.54); }
+  #editorStatus { font-size: .85rem; color: rgba(238,241,247,.54); min-height: 20px; }
+  #editorStatus.ok { color: #74c476; }
+  #editorStatus.bad { color: #cf8e97; }
+
+  .editor-map-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+  .editor-map-item {
+    display: grid; grid-template-columns: 56px 1fr auto auto; gap: 8px; align-items: center;
+    border: 1px solid #212840; border-radius: 10px; padding: 6px; background: rgba(13,16,26,.7);
+  }
+  .editor-map-item svg { width: 56px; height: 36px; border-radius: 6px; background: #10141f; display: block; }
+  .editor-map-meta { display: grid; min-width: 0; }
+  .editor-map-meta b { font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editor-map-meta small { color: rgba(238,241,247,.54); font-size: .72rem; }
+  .editor-mini {
+    border: 1px solid #2a3350; border-radius: 7px; padding: 6px 9px; cursor: pointer;
+    background: #1f2638; color: rgba(238,241,247,.72); font-size: .78rem; font-weight: 700;
+  }
+  .editor-mini:hover { border-color: #74c476; }
+  .editor-mini.danger { color: #cf8e97; border-color: rgba(223,106,95,.5); }
+  .editor-mini.danger:hover { border-color: #df6a5f; }
+  .editor-empty { color: rgba(238,241,247,.54); font-size: .84rem; padding: 6px 2px; }
+
+  details.adv { border: 1px solid #212840; border-radius: 10px; padding: 10px 12px; background: rgba(13,16,26,.5); }
+  details.adv summary { cursor: pointer; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: rgba(238,241,247,.54); }
+  details.adv[open] summary { color: rgba(238,241,247,.72); margin-bottom: 8px; }
+  .hint { font-size: .8rem; color: rgba(238,241,247,.54); margin: 6px 0 0; }
+</style>
+</head>
+<body>
+  <header class="editor-head">
+    <div class="editor-title">
+      <h1 data-i18n="editor.title">Редактор карт</h1>
+      <span class="sub" data-i18n="editor.sub">Bridge Guardians · построй свою дорогу</span>
+    </div>
+    <div class="head-actions">
+      <span id="editorPointCount">Точек: 0</span>
+      <a class="back-link" id="backLink" href="index.html" data-i18n="editor.back">← В игру</a>
+      <button class="play-link" id="btnPlayNow" type="button" title="Сохранить и сразу открыть игру" data-i18n-title="editor.playTitle" data-i18n="editor.play">▶ Играть</button>
+    </div>
+  </header>
+
+  <div class="steps">
+    <div class="step"><b>1</b><span data-i18n="editor.step1">Выбери шаблон или «С нуля»</span></div>
+    <div class="step"><b>2</b><span data-i18n="editor.step2">Кликай по дороге, чтобы добавить повороты · тяни точки мышью</span></div>
+    <div class="step"><b>3</b><span data-i18n="editor.step3">Двойной клик по точке — удалить · Ctrl+Z — отменить</span></div>
+    <div class="step"><b>4</b><span data-i18n="editor.step4">«Сохранить» — и карта появится в игре</span></div>
+  </div>
+
+  <main class="editor-layout">
+    <section>
+      <div id="editorWrap">
+        <canvas id="editorCanvas" width="1000" height="640"></canvas>
+      </div>
+      <div class="toolbar">
+        <button class="tbtn" data-template="straight" type="button" data-i18n="editor.tplStraight">➡️ Прямая</button>
+        <button class="tbtn" data-template="serpentine" type="button" data-i18n="editor.tplSerpentine">〰️ Змейка</button>
+        <button class="tbtn" data-template="ridge" type="button" data-i18n="editor.tplRidge">🌉 Мост</button>
+        <button class="tbtn" data-template="circuit" type="button" data-i18n="editor.tplCircuit">🔁 Контур</button>
+        <button class="tbtn" data-template="coreline" type="button" data-i18n="editor.tplCoreline">📏 Линия</button>
+        <button class="tbtn" data-template="empty" type="button" data-i18n="editor.tplEmpty">✏️ С нуля</button>
+        <span class="divider"></span>
+        <button class="tbtn active" id="btnSnap" type="button" data-i18n="editor.snapOn">Сетка: вкл</button>
+        <button class="tbtn" id="btnUndo" type="button" data-i18n="editor.undo">↶ Отменить</button>
+        <button class="tbtn danger" id="btnClear" type="button" data-i18n="editor.clear">🗑 Очистить</button>
+      </div>
+      <p class="hint" data-i18n="editor.edgeHint">Начало дороги должно быть у левого края (враги приходят слева), конец — у правого, там будет ядро.</p>
+    </section>
+
+    <aside class="side">
+      <div class="field">
+        <label for="editorName" data-i18n="editor.name">Название карты</label>
+        <input type="text" id="editorName" maxlength="28" value="Моя карта">
+      </div>
+      <div class="field">
+        <label for="editorDesc" data-i18n="editor.desc">Описание (необязательно)</label>
+        <input type="text" id="editorDesc" maxlength="60" value="Пользовательский маршрут">
+      </div>
+      <input type="hidden" id="mapId" value="">
+      <button class="tbtn primary" id="btnSave" type="button" data-i18n="editor.save">💾 Сохранить карту</button>
+      <div id="editorStatus"></div>
+
+      <div>
+        <h2 data-i18n="editor.myMaps">Мои карты</h2>
+        <ul class="editor-map-list" id="editorMapList"></ul>
+      </div>
+
+      <details class="adv">
+        <summary data-i18n="editor.adv">Другое · экспорт / импорт</summary>
+        <textarea id="importBox" placeholder='JSON карты: {"neonMap":1,"maps":[…]} — сюда же попадает экспорт'></textarea>
+        <div class="toolbar" style="margin-top:6px">
+          <button class="tbtn" id="btnExport" type="button" data-i18n="editor.export">Экспорт в JSON</button>
+          <button class="tbtn" id="btnImport" type="button" data-i18n="editor.import">Импорт из JSON</button>
+        </div>
+        <p class="hint" data-i18n="editor.advHint">Нужно, если открыли игру двойным кликом по файлу (file://) и вкладки не делят хранилище.</p>
+      </details>
+    </aside>
+  </main>
+
+  <script src="i18n.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
