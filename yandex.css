@@ -83,14 +83,15 @@ body {
 .map-list::-webkit-scrollbar { width: 8px; }
 .map-list::-webkit-scrollbar-thumb { background: rgba(238,241,247,.14); border-radius: 999px; }
 
-/* Панель рейтингового боя в top-bar: на телефоне — горизонтальная строка,
-   чтобы не растягивать полосу статусов на два ряда. */
+/* Панель рейтингового боя (duel.js) — пилюля, позиционируется JS по канвасу.
+   На телефоне компактнее; positionPanel сам опустит её на верх канваса, если
+   над полем не хватает места. Итог/победа дают flex-wrap (styles.css), так что
+   здесь только размеры. */
 @media (max-width: 700px) {
-  .status-strip>div.duel-panel{display:none;flex:1 1 100%;align-items:center;gap:9px;text-align:left;padding:7px 10px}
-  .duel-panel.is-shown{display:flex!important}
-  .duel-panel .duel-wave{display:inline;margin-right:2px}
-  .duel-panel .duel-label{display:inline;flex:1;min-width:0}
-  .duel-dot{position:static;flex:0 0 7px}
+  .duel-panel{gap:6px;padding:5px 10px;font-size:9px}
+  .duel-me b,.duel-opp b{font-size:14px}
+  .duel-side small{font-size:7.5px}
+  .duel-label{font-size:9px;max-width:60vw}
 }
 
 .map-preview {

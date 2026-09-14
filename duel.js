@@ -1,46 +1,58 @@
 /* =========================================================
-   duel.js — «Рейтинговый бой» (соревновательный онлайн-режим v0)
+   duel.js — «Рейтинговый бой» (соревновательный онлайн-режим v2)
    Вход: кнопка «⚔ Рейтинговый бой» в главном меню -> core.startRankedGame().
-   Отличия боя от обычной партии (реализованы в game-core.js): нет паузы,
-   нет ускорителя x2/x3, вместо «Главное меню» — «Сдаться» (2 клика).
+   Отличия боя от обычной партии (game-core.js): нет паузы, нет ускорителя
+   (x1), вместо «Главное меню» — «Сдаться» (2 клика).
 
-   Реальный realtime-PvP на Яндекс.Играх недоступен: у платформы нет
-   сокетов/матчмейкинга, а свои серверы правилами запрещены. Поэтому обмен
-   живёт по LOW-FREQUENCY каналу — таблице лидеров:
-     · каждые PUSH_MS шлём ysdk.leaderboards.setScore(name, рейтинг, String(волна));
-     · каждые POLL_MS читаем getEntries ищем соперника по player.uniqueID;
-     · панель показывает его волну и разницу;
-   «побеждает тот, кто дожил дольше» — на game over сравниваем финальные
-   волны. Волна монотонна, а «лучший результат» в ЛБ = текущая, так что
-   канал работает честно в обе стороны (задержка 5–15 с — асинхронный
-   формат). Код таблицы: window.NEON_DUEL_LB_CODE, иначе —
-   по умолчанию neon_rating. Вне платформы (git/file://), при пустой таблице или 3
-   ошибках канала — соперник «призрачный игрок» (бот-гоуст); панель честно
-   подписывает режим.
+   Реальный realtime-PvP на Яндекс.Играх недоступен (нет сокетов/матчмейкинга,
+   свои серверы запрещены), поэтому обмен живёт по LOW-FREQUENCY каналу —
+   таблице лидеров современного API ysdk.leaderboards:
+     · score = РЕЙТИНГ (его показывает лидерборд), extraData (строка) = волна
+       — технический канал гонки;
+     · каждые PUSH_MS setScore(name, рейтинг, String(волна)); каждые POLL_MS
+       getEntries ищем соперника по player.uniqueID;
+     · панель — пилюля ПО ЦЕНТРУ НАД игровым полем: «вы ⚔ соперник» обеими
+       волнами и подписью режима;
+     · ПОБЕДА ЗАСЧИТЫВАЕТСЯ СРАЗУ: как только наша волна обогнала волну
+       соперника и его счёт молчит WIN_LOCK_MS (завершил партию) — +25
+       начисляются немедленно, ещё до нашего game over;
+     · на game over — добиваем итог: поражение/сдача = −25, ничья 0; бой с
+       «призрачным игроком» (вне платформы/без авторизации/пустой таблицы/
+       3 ошибок канала) нерейтингов («бой без рейтинга»);
+     · дельта лежит в duel.lastDelta — финальный экран core печатает
+       «Рейтинг: N (+25/−25)».
+   Код таблицы: window.NEON_DUEL_LB_CODE, по умолчанию neon_rating — обязан
+   совпасть с «Техническим названием лидерборда» в Консоли, иначе 404.
    ========================================================= */
 (function () {
   "use strict";
 
-  const PUSH_MS = 8000;    // как часто отправляем свою волну
-  const POLL_MS = 10000;   // как часто читаем соперника
-  const RENDER_MS = 900;   // перерисовка панели (и языка)
-  const STALE_MS = 45000;  // соперник не двигается — «замолчал»
-  const RATING_STEP = 25;  // рейтинг за победу против человека (сдача = −25)
+  const PUSH_MS = 8000;     // как часто отправляем свой результат
+  const POLL_MS = 10000;    // как часто читаем соперника
+  const RENDER_MS = 900;    // перерисовка панели / тик призрака
+  const STALE_MS = 45000;   // соперник молчит дольше — гасим индикатор
+  const RATING_STEP = 25;   // рейтинг за победу против человека (сдача = −25)
+  const WIN_LOCK_MS = 35000; // тишины в волне соперника = «партию он закончил»
 
   const duel = {
     running: false,
     mode: "bot",             // "yandex" | "bot"
     board: null,             // код таблицы лидеров
     myUid: null,
-    opponent: null,          // { uid, name, wave, seenAt }
+    opponent: null,          // { uid, name, rating, wave, seenAt }
+    oppLastChange: 0,        // когда волна соперника в последний раз двигалась
     bot: null,               // { wave, acc, step, final, done }
     myWave: 0,
     result: null,
+    lastDelta: 0,            // дельта рейтинга за бой (0 для нерейтинговых)
+    wonEarly: false,         // победа зафиксирована до game over
+    ratingApplied: false,
     pushTimer: null,
     pollTimer: null,
     renderTimer: null,
     errors: 0,
     panel: null,
+    texts: null,
     menuBtn: null,
   };
   window.NeonDuel = duel;
@@ -54,99 +66,163 @@
       "ui.duelSearching": "Ищем соперника…",
       "ui.duelOnline": "онлайн",
       "ui.duelBot": "призрачный игрок",
+      "ui.duelYou": "вы",
+      "ui.duelOpp": "соперник",
       "ui.duelLead": "опережаете на {n}",
       "ui.duelBehind": "отстаёте на {n}",
       "ui.duelEven": "волна в волну",
       "ui.duelWin": "Выжили дольше соперника: волна {a} против {b}",
+      "ui.duelWinLocked": "Победа! Соперник завершил бой на волне {b}",
       "ui.duelLose": "Соперник выжил дольше: {b} против {a}",
       "ui.duelDraw": "Одинаковая волна — ничья",
       "ui.duelSurrendered": "Сдались — соперник побеждает",
+      "ui.duelUnrated": "бой без рейтинга",
+      "ui.ratingWord": "рейтинга",
+      "ui.rankedBtn": "⚔ Рейтинговый бой · {rating}",
     };
-    return (RU[key] || key).replace(/\{(\w)\}/g, (_, k) => (params && params[k] != null ? params[k] : `{${k}}`));
+    const raw = RU[key] || key;
+    return params ? raw.replace(/\{(\w+)\}/g, (_, k) => (params[k] != null ? params[k] : `{${k}}`)) : raw;
   };
 
-  /* ---------------- панель ---------------- */
+  /* ---------------- панель: пилюля по центру над игровым полем ---------- */
   function makeEl(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     if (text != null) e.textContent = text;
     return e;
   }
-  // Панель боя — НЕ над полем, а в.top-bar'е рядом с кассой (v59.15): box в
-  // .status-strip, тот же стиль, что у счётчиков ВОЛНА/УБИЙСТВА/ЖИЗНИ/CASH.
-  // Никакого абсолютного позиционирования и «съезжания» в яндекс-оболочке.
+  function gameCanvas() {
+    return document.getElementById("game") || document.querySelector("canvas");
+  }
+  // Хост = ближайший позиционированный предок канваса (в реальной вёрстке —
+  // .arena-wrap с position:relative), иначе — экран игры.
+  function panelHost() {
+    const canvas = gameCanvas();
+    let el = canvas && canvas.parentElement;
+    while (el && el !== document.body) {
+      try {
+        const pos = window.getComputedStyle ? window.getComputedStyle(el).position : null;
+        if (pos && pos !== "static") return el;
+      } catch (e) {}
+      if (el.id === "gameScreen") return el;
+      el = el.parentElement;
+    }
+    return document.getElementById("gameScreen") || document.body;
+  }
   function buildPanel() {
     if (duel.panel) return;
-    const strip = document.querySelector(".status-strip") ||
-      document.querySelector(".topbar") || document.body;
-    if (!strip || !strip.appendChild) return;
+    const host = panelHost();
+    if (!host || !host.appendChild) return;
     const box = makeEl("div", "duel-panel");
     box.id = "duelPanel";
     box.setAttribute("aria-live", "polite");
     const dot = makeEl("span", "duel-dot");
-    const wave = makeEl("span", "duel-wave", "…");
+    const meSide = makeEl("span", "duel-side duel-me");
+    const meNum = makeEl("b", null, "…");
+    meSide.append(meNum, makeEl("small", null, T("ui.duelYou")));
+    const vs = makeEl("span", "duel-vs", "⚔");
+    const oppSide = makeEl("span", "duel-side duel-opp");
+    const oppNum = makeEl("b", null, "…");
+    oppSide.append(oppNum, makeEl("small", null, T("ui.duelOpp")));
     const label = makeEl("small", "duel-label", T("ui.duelTitle"));
-    box.append(dot, wave, label);
-    strip.appendChild(box);
+    box.append(dot, meSide, vs, oppSide, label);
+    host.appendChild(box);
     duel.panel = box;
-    duel.texts = { wave, label, dot };
+    duel.texts = { me: meNum, opp: oppNum, label, dot, vs, meSide, oppSide };
+  }
+
+  // Абсолютная привязка к фактическому прямоугольнику канваса: по центру
+  // горизонтали поля, на WIN_GAP над ним; если запаса нет — в верхнюю полосу
+  // канваса (пилюля не должна клиповаться overflow-хостом).
+  function positionPanel() {
+    try {
+      const p = duel.panel;
+      if (!p || p.style.display === "none") return;
+      const canvas = gameCanvas();
+      const host = p.offsetParent || p.parentElement;
+      if (!canvas || !host || typeof canvas.getBoundingClientRect !== "function" ||
+          typeof host.getBoundingClientRect !== "function" || typeof p.getBoundingClientRect !== "function") return;
+      const cr = canvas.getBoundingClientRect();
+      const hr = host.getBoundingClientRect();
+      const pr = p.getBoundingClientRect();
+      if (!cr.width || !pr.width) return;
+      const left = cr.left - hr.left + (cr.width - pr.width) / 2;
+      let top = cr.top - hr.top - pr.height - 8;
+      if (top < 4) top = cr.top - hr.top + 6;
+      p.style.left = Math.round(left) + "px";
+      p.style.top = Math.round(top) + "px";
+    } catch (e) { /* стенды без геометрии */ }
+  }
+
+  /* ---------------- ранний замок победы ---------------- */
+  function applyRating(delta) {
+    if (duel.ratingApplied || !delta) return;
+    duel.ratingApplied = true;
+    duel.lastDelta = delta;
+    try { window.NeonRating && window.NeonRating.add(delta); } catch (e) {}
+    pushRating();
+    refreshMenuButton();
+  }
+  function checkEarlyWin() {
+    if (!duel.running || duel.result || duel.wonEarly) return;
+    if (duel.mode !== "yandex" || !duel.opponent || duel.opponent.wave == null) return;
+    if (duel.myWave <= duel.opponent.wave) return;
+    if (Date.now() - duel.oppLastChange < WIN_LOCK_MS) return;
+    // Соперник молчит на своей финальной волне, а мы её пережили — победа.
+    duel.wonEarly = true;
+    duel.result = T("ui.duelWinLocked", { b: duel.opponent.wave });
+    applyRating(RATING_STEP);
   }
 
   function renderPanel() {
     buildPanel();
     if (!duel.panel) return;
+    checkEarlyWin();
     const t = duel.texts;
     const show = duel.running || duel.result;
-    duel.panel.style.display = show ? "block" : "none";
-    duel.panel.classList.toggle("is-shown", show); // мобильный flex в yandex.css
+    duel.panel.style.display = show ? "flex" : "none";
+    duel.panel.classList.toggle("is-shown", show);
     if (!show) return;
 
     const mode = duel.mode === "yandex" ? T("ui.duelOnline") : T("ui.duelBot");
+    const names = duel.panel.querySelectorAll(".duel-side small");
+    if (names.length === 2) { names[0].textContent = T("ui.duelYou"); names[1].textContent = T("ui.duelOpp"); }
+    t.me.textContent = String(duel.myWave);
 
     if (duel.mode === "yandex" && !duel.opponent) {
-      t.wave.textContent = "…";
+      t.opp.textContent = "…";
       t.label.textContent = T("ui.duelSearching");
-      duel.panel.classList.remove("is-losing", "is-stale", "has-result");
+      duel.panel.classList.remove("is-losing", "is-stale", "has-result", "is-won");
+      positionPanel();
       return;
     }
-    const oppWaveRaw = duel.opponent ? duel.opponent.wave : duel.bot.wave;
+    const oppWave = duel.opponent ? duel.opponent.wave : (duel.bot ? duel.bot.wave : null);
     const who = duel.opponent && duel.opponent.name ? duel.opponent.name : mode;
-    if (oppWaveRaw == null) {
-      // Волна соперника ещё не прилетела в extraData — честно показываем прочерк.
-      t.wave.textContent = "—";
-      t.label.textContent = who;
-      duel.panel.classList.toggle("is-stale", true);
-      duel.panel.classList.toggle("is-losing", false);
-      duel.panel.classList.toggle("has-result", !!duel.result);
-      if (duel.result) t.label.textContent = duel.result;
-      return;
-    }
-    const oppWave = oppWaveRaw;
-    t.wave.textContent = String(oppWave);
+    t.opp.textContent = oppWave == null ? "—" : String(oppWave);
 
     const stale = duel.opponent && Date.now() - duel.opponent.seenAt > STALE_MS;
-    const diff = duel.myWave - oppWave;
-    let delta;
-    if (diff > 0) delta = T("ui.duelLead", { n: diff });
-    else if (diff < 0) delta = T("ui.duelBehind", { n: -diff });
-    else delta = T("ui.duelEven");
-
-    duel.panel.classList.toggle("is-losing", diff < 0);
-    duel.panel.classList.toggle("is-stale", !!stale);
-    duel.panel.classList.toggle("has-result", !!duel.result);
-    t.label.textContent = duel.result ? duel.result : who + " · " + delta;
+    let deltaText = who;
+    if (oppWave != null) {
+      const diff = duel.myWave - oppWave;
+      const rel = diff > 0 ? T("ui.duelLead", { n: diff })
+        : diff < 0 ? T("ui.duelBehind", { n: -diff })
+        : T("ui.duelEven");
+      deltaText = who + " · " + rel;
+    }
+    duel.panel.classList.toggle("is-losing", !duel.result && oppWave != null && duel.myWave < oppWave);
+    duel.panel.classList.toggle("is-stale", !!stale && !duel.result);
+    duel.panel.classList.toggle("has-result", !!duel.result && !duel.wonEarly);
+    duel.panel.classList.toggle("is-won", !!duel.result && duel.wonEarly);
+    t.label.textContent = duel.result ? duel.result : deltaText;
+    positionPanel();
   }
 
-  /* ---------------- канал лидерборда (современный ysdk.leaderboards) -------- */
+  /* ---------------- канал лидерборда (современный ysdk.leaderboards) ----- */
   // Реальный API SDK (docs: sdk/sdk-leaderboard):
   //   ysdk.leaderboards.setScore(name, score:number, extraData?:string)
   //   ysdk.leaderboards.getEntries(name, {quantityTop, quantityAround, includeUser})
   //     -> { entries: [{ score, extraData, rank, player:{ publicName, uniqueID } }], userRank }
-  //   ysdk.leaderboards.getPlayerEntry(name) -> entry
   // ysdk.getLeaderboards() устарел, player.getLeaderboards() не существует.
-  //score = РЕЙТИНГ (виден в таблице), extraData = волна (технический канал
-  //гонки, строка). name таблицы обязан совпасть с полем «Техническое название
-  //лидерборда» в Консоли, иначе 404.
   let lbApiPromise = null;
   function leaderboardsApi() {
     if (lbApiPromise) return lbApiPromise;
@@ -155,7 +231,7 @@
       if (!s) return null;
       const l = s.leaderboards;
       if (l && typeof l.getEntries === "function" && typeof l.setScore === "function") return l;
-      if (typeof s.getLeaderboards === "function") { // деprecation-мост на всякий
+      if (typeof s.getLeaderboards === "function") { // deprecated-мост на всякий
         try {
           const old = await s.getLeaderboards();
           if (old && typeof old.getLeaderboardEntries === "function") {
@@ -218,6 +294,7 @@
         wave: waveOf(pick),
         seenAt: Date.now(),
       };
+      duel.oppLastChange = Date.now();
       duel.mode = "yandex";
     } catch (e) {
       duel.mode = "bot";
@@ -235,6 +312,7 @@
         if (!row) return;
         const wave = waveOf(row);
         const rating = ratingOf(row);
+        if (wave !== duel.opponent.wave) duel.oppLastChange = Date.now();
         if (wave !== duel.opponent.wave || rating !== duel.opponent.rating) duel.opponent.seenAt = Date.now();
         duel.opponent.wave = wave;
         duel.opponent.rating = rating;
@@ -297,6 +375,7 @@
     [duel.pushTimer, duel.pollTimer, duel.renderTimer].forEach(id => id && clearInterval(id));
     duel.pushTimer = duel.pollTimer = duel.renderTimer = null;
   }
+  try { window.addEventListener("resize", () => positionPanel()); } catch (e) {}
 
   // core вызывает при каждой новой партии; панель нужна только в бою.
   duel.onGameStart = function (ranked) {
@@ -304,13 +383,17 @@
     duel.myWave = 0;
     duel.opponent = null;
     duel.bot = null;
+    duel.oppLastChange = 0;
+    duel.lastDelta = 0;
+    duel.wonEarly = false;
+    duel.ratingApplied = false;
     duel.errors = 0;
     duel.running = false;
     if (!ranked) { stopTimers(); renderPanel(); return; }
     duel.running = true;
     buildPanel();
     refreshMenuButton();
-    // Оптимистично в «поиске» (yandex без соперника = «…»), findOnlineOpponent
+    // Оптимистично в «поиске» (yandex без соперника = «…»); findOnlineOpponent
     // сам решит канал: современный API лидербордов или честный возврат в бота.
     duel.mode = "yandex";
     findOnlineOpponent();
@@ -327,6 +410,14 @@
     duel.running = false;
     stopTimers();
     duel.myWave = Math.max(duel.myWave, finalWave || duel.myWave);
+    if (duel.wonEarly && duel.result) {
+      // Победа уже зафиксирована и рейтинг начислен — итог не меняем,
+      // но финальную волну дописываем в extraData таблицы.
+      pushRating();
+      renderPanel();
+      refreshMenuButton();
+      return;
+    }
     const oppWaveRaw = duel.opponent ? duel.opponent.wave : (duel.bot ? duel.bot.wave : null);
     const oppWave = oppWaveRaw == null ? duel.myWave : oppWaveRaw; // неизвестно -> «волна в волну»
     // Рейтингованная партия — только человек против человека (живой лидерборд).
@@ -341,10 +432,10 @@
       else if (duel.myWave > oppWave) delta = RATING_STEP;
     }
     if (delta) {
-      try { window.NeonRating && window.NeonRating.add(delta); } catch (e) {}
+      applyRating(delta);
       duel.result = base + " · " + (delta > 0 ? "+" : "") + delta + " " + T("ui.ratingWord");
-      pushRating(); // таблица обновляется сразу, не дожидаясь тика
     } else {
+      duel.lastDelta = 0;
       duel.result = rated ? base : base + " · " + T("ui.duelUnrated");
     }
     renderPanel();
@@ -365,9 +456,7 @@
     const btn = makeEl("button", "menu-ranked", rankedLabel());
     btn.id = "rankedBattleBtn";
     btn.type = "button";
-    // data-i18n НЕ вешаем: в подписи живое число рейтинга, его пишет duel.js
-    // (при смене языка текст вернётся через applyDom->перезапуск меню не нужен:
-    //  кнопка перелинковывается refreshMenuButton по тикам и после боёв).
+    // data-i18n НЕ вешаем: в подписи живое число рейтинга — рулит refresh.
     btn.addEventListener("click", () => {
       // core.startRankedGame — глобальная функция game-core.js
       if (typeof startRankedGame === "function") startRankedGame();
@@ -384,10 +473,14 @@
   // Смена языка: у кнопки нет data-i18n (в подписи рейтинг) — перелинковка по hook.
   try { window.NeonI18N && window.NeonI18N.onChange(refreshMenuButton); } catch (e) {}
 
-  // Хуки для автотестов (harness.js): прокрутка призрака без реальных таймеров.
+  // Хуки для автотестов (harness.js).
   duel.testHooks = {
     tick: dt => tickBot(dt),
     render: renderPanel,
     match: findOnlineOpponent,
+    // «соперник замолчал навсегда» — для проверки раннего замка победы;
+    // и его волна: setter без живого лидерборда.
+    silence: () => { duel.oppLastChange = 0; },
+    oppWave: n => { if (duel.opponent) { duel.opponent.wave = n; duel.oppLastChange = Date.now(); } },
   };
 })();

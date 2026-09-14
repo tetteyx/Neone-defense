@@ -298,37 +298,37 @@ const TEST_MONEY = 999999999;
 ========================================================= */
 const towerTypes = {
   booster: {
-    name: "Усилитель", cost: 900, unlockWave: 5, damage: 0, range: 145, fireRate: 999, color: "#74c476",
+    name: "Усилитель", cost: 1150, unlockWave: 5, damage: 0, range: 145, fireRate: 999, color: "#74c476",
     description: "+40% урон (Damage+)",
     support: { dmgPct: 0.40 }
   },
   overcharger: {
-    name: "Разгонщик", cost: 1400, unlockWave: 11, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
+    name: "Разгонщик", cost: 1800, unlockWave: 11, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
     description: "+120% скорость (Rate+)",
     support: { ratePct: 1.20 }
   },
   range_amp: {
-    name: "Дальний модуль", cost: 500, unlockWave: 3, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
+    name: "Дальний модуль", cost: 650, unlockWave: 3, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
     description: "+100% радиус (Range+)",
     support: { rngPct: 1.00 }
   },
   reactor: {
-    name: "Реактор", cost: 2200, unlockWave: 14, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
+    name: "Реактор", cost: 2800, unlockWave: 14, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
     description: "+100% урон (Damage++)",
     support: { dmgPct: 1.00 }
   },
   nexus: {
-    name: "Нексус", cost: 1800, unlockWave: 16, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
+    name: "Нексус", cost: 2300, unlockWave: 16, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
     description: "+100% урон, −30% радиус и скорость (Big Dmg Exch.)",
     support: { dmgPct: 1.00, rngPct: -0.30, ratePct: -0.30 }
   },
   rate_xchg: {
-    name: "Частотник", cost: 700, unlockWave: 7, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
+    name: "Частотник", cost: 900, unlockWave: 7, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
     description: "+60% скорость, −40% урон, −10% радиус (Rate Exch.)",
     support: { ratePct: 0.60, dmgPct: -0.40, rngPct: -0.10 }
   },
   range_xchg: {
-    name: "Ретранслятор", cost: 850, unlockWave: 9, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
+    name: "Ретранслятор", cost: 1100, unlockWave: 9, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
     description: "+100 радиус, −25% скорость (Range Exch.)",
     support: { rngFlat: 100, ratePct: -0.25 }
   },
@@ -434,7 +434,7 @@ const towerTypes = {
   // ── ПРОДВИНУТЫЕ: Sniper / Fusion / Railgun / Combonly (цена и $ из FAQ) ──
   titan: {
     name: "Титан",
-    cost: 3200,
+    cost: 4000,
     unlockWave: 12,
     color: "#e08b52",
     projectileSpeed: 760,
@@ -455,7 +455,7 @@ const towerTypes = {
 
   nova: {
     name: "Нова",
-    cost: 3600,
+    cost: 4400,
     unlockWave: 14,
     color: "#eef1f7",
     projectileSpeed: 1400,
@@ -475,7 +475,7 @@ const towerTypes = {
 
   devastator: {
     name: "Опустошитель",
-    cost: 2600,
+    cost: 3200,
     unlockWave: 10,
     color: "#c9504f",
     projectileSpeed: 2400,
@@ -494,7 +494,7 @@ const towerTypes = {
 
   singularity: {
     name: "Нуль-коллайдер",
-    cost: 2800,
+    cost: 3500,
     unlockWave: 18,
     color: "#eec76a",
     projectileSpeed: 520,
@@ -4769,6 +4769,21 @@ function endGame(win) {
     endText.textContent = tl("end.gameoverText", { k: state.kills });
   }
 
+  // Рейтинговый бой: на финале — волна и рейтинг С ДЕЛЬТОЙ боя
+  // («Рейтинг: 40 (−25)»); дельту считает duel.js (включая ранний замок).
+  if (state.ranked) {
+    try {
+      const d = Math.round((window.NeonDuel && window.NeonDuel.lastDelta) || 0);
+      const r = window.NeonRating ? window.NeonRating.get() : (state.rating || 0);
+      const ratingLine = tl("ranked.ratingLine", { n: r }) + (d ? " (" + (d > 0 ? "+" : "") + d + ")" : "");
+      if (!win && !state.rankedSurrendered) {
+        endText.textContent = tl("ranked.waveText", { n: state.wave }) + "\n" + ratingLine;
+      } else {
+        endText.textContent = endText.textContent + "\n" + ratingLine;
+      }
+    } catch (e) {}
+  }
+
   setGameOverUi(true);
   endModal.classList.remove(
       "hidden"
@@ -5000,23 +5015,38 @@ function loadGame() {
    (дуэль волн через лидерборд/призрака) активна только здесь. */
 // ── Рейтинг рейтингового боя ──────────────────────────────────────────────
 // Отдельный localStorage-ключ (не внутри сейва партии!): бой на game over не
-// должен пороывать «мёртвое» сохранение. Ключ проксируется в облако Яндекса
-// мостом game.js (neonBridgeDefenseRating_v1), рейтинг синхронизируется между
-// устройствами. duel.js читает/пишет через window.NeonRating.
+// должен порождать «мёртвое» сохранение. Привязан к аккаунту Яндекса: при
+// авторизации ключ суффиксится uniqueID (…_v1_<uid>), поэтому два аккаунта в
+// одном браузере не делят чужой рейтинг. Суффикс-схема идентична game.js
+// (restore/migrate/bridge). В облако player.setData уходит под базовым ключом
+// (облако и так per-player). duel.js читает/пишет через window.NeonRating.
 const RATING_KEY = "neonBridgeDefenseRating_v1";
+function ratingStorageKey() {
+  let uid = "";
+  try {
+    const p = window.NeonBridgeYandex && window.NeonBridgeYandex.player;
+    if (p && typeof p.getUniqueID === "function") uid = String(p.getUniqueID() || "");
+  } catch (e) {}
+  return uid ? RATING_KEY + "_" + uid : RATING_KEY;
+}
 window.NeonRating = {
+  key: ratingStorageKey,
   get() {
     try {
-      return Math.max(0, parseInt(localStorage.getItem(RATING_KEY), 10) || 0);
+      return Math.max(0, parseInt(localStorage.getItem(ratingStorageKey()), 10) || 0);
     } catch (e) {
       return state.rating || 0;
     }
   },
-  add(delta) {
-    const next = Math.max(0, this.get() + (Math.round(delta) || 0));
-    try { localStorage.setItem(RATING_KEY, String(next)); } catch (e) {}
+  set(value) {
+    const next = Math.max(0, Math.round(+value) || 0);
+    try { localStorage.setItem(ratingStorageKey(), String(next)); } catch (e) {}
     state.rating = next;
+    try { window.NeonDuel && window.NeonDuel.refreshMenuButton && window.NeonDuel.refreshMenuButton(); } catch (e) {}
     return next;
+  },
+  add(delta) {
+    return this.set(this.get() + (Math.round(delta) || 0));
   },
 };
 try { state.rating = window.NeonRating.get(); } catch (e) { state.rating = 0; }

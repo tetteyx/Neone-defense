@@ -346,13 +346,28 @@
         window.NeonGameBridge?.refreshMenu?.();
       }
 
-      // Рейтинг: облако перетягивает только если БОЛЬШЕ локального — свежая
-      // офлайн-сессия на этом устройстве не затирается старым облаком.
+      // Рейтинг привязан к аккаунту: локальный ключ суффиксится uniqueID
+      // (схема идентична ratingStorageKey() в game-core). Миграция со
+      // «общего» ключа старых версий + облако (перетягивает, только если
+      // больше локального — свежий офлайн-прогресс не затирается).
       try {
+        let uid = "";
+        try { uid = String(player.getUniqueID ? player.getUniqueID() || "" : ""); } catch (e) {}
+        const acctKey = uid ? `${GAME_RATING_KEY}_${uid}` : GAME_RATING_KEY;
+        const readRating = k => {
+          try { return parseInt(window.localStorage.getItem(k), 10); } catch (e) { return NaN; }
+        };
+        if (acctKey !== GAME_RATING_KEY) {
+          const acct = readRating(acctKey);
+          const legacy = readRating(GAME_RATING_KEY);
+          if (!Number.isFinite(acct) && Number.isFinite(legacy)) {
+            window.localStorage.setItem(acctKey, String(Math.max(0, legacy)));
+          }
+        }
         const cloudRating = parseInt(data?.[GAME_RATING_KEY], 10);
-        const localRating = parseInt(window.localStorage.getItem(GAME_RATING_KEY), 10) || 0;
+        const localRating = readRating(acctKey) || 0;
         if (Number.isFinite(cloudRating) && cloudRating > localRating) {
-          window.localStorage.setItem(GAME_RATING_KEY, String(cloudRating));
+          window.localStorage.setItem(acctKey, String(cloudRating));
         }
       } catch (e) {}
 
@@ -406,10 +421,17 @@
     const nativeSetItem = storage.setItem.bind(storage);
     const nativeRemoveItem = storage.removeItem.bind(storage);
 
+    const cloudKeyFor = key => {
+      if (key === GAME_SAVE_KEY) return GAME_SAVE_KEY;
+      if (key === GAME_RATING_KEY || key.indexOf(GAME_RATING_KEY + "_") === 0) return GAME_RATING_KEY;
+      return null;
+    };
+
     storage.setItem = function (key, value) {
       nativeSetItem(key, value);
-      if ((key === GAME_SAVE_KEY || key === GAME_RATING_KEY) && typeof value === "string") {
-        player.setData({ [key]: value }, true).catch(() => {});
+      const cloudKey = cloudKeyFor(key);
+      if (cloudKey && typeof value === "string") {
+        player.setData({ [cloudKey]: value }, true).catch(() => {});
       }
     };
 
