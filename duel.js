@@ -7,14 +7,14 @@
    Реальный realtime-PvP на Яндекс.Играх недоступен: у платформы нет
    сокетов/матчмейкинга, а свои серверы правилами запрещены. Поэтому обмен
    живёт по LOW-FREQUENCY каналу — таблице лидеров:
-     · каждые PUSH_MS шлём setScore(score = рейтинг, extraScore = волна);
-     · каждые POLL_MS читаем getScores ищем соперника по uniqueId;
+     · каждые PUSH_MS шлём ysdk.leaderboards.setScore(name, рейтинг, String(волна));
+     · каждые POLL_MS читаем getEntries ищем соперника по player.uniqueID;
      · панель показывает его волну и разницу;
    «побеждает тот, кто дожил дольше» — на game over сравниваем финальные
    волны. Волна монотонна, а «лучший результат» в ЛБ = текущая, так что
    канал работает честно в обе стороны (задержка 5–15 с — асинхронный
-   формат). Код таблицы: window.NEON_DUEL_LB_CODE, иначе — первая из
-   getList(). Вне платформы (git/file://), при пустой таблице или 3
+   формат). Код таблицы: window.NEON_DUEL_LB_CODE, иначе —
+   по умолчанию neon_rating. Вне платформы (git/file://), при пустой таблице или 3
    ошибках канала — соперник «призрачный игрок» (бот-гоуст); панель честно
    подписывает режим.
    ========================================================= */
@@ -112,7 +112,7 @@
     const oppWaveRaw = duel.opponent ? duel.opponent.wave : duel.bot.wave;
     const who = duel.opponent && duel.opponent.name ? duel.opponent.name : mode;
     if (oppWaveRaw == null) {
-      // Волна соперника ещё не прилетела в extraScore — честно показываем прочерк.
+      // Волна соперника ещё не прилетела в extraData — честно показываем прочерк.
       t.wave.textContent = "—";
       t.label.textContent = who;
       duel.panel.classList.toggle("is-stale", true);
@@ -137,21 +137,56 @@
     t.label.textContent = duel.result ? duel.result : who + " · " + delta;
   }
 
-  /* ---------------- выбор соперника ---------------- */
-  function bridgePlayer() {
-    const b = window.NeonBridgeYandex;
-    return b && b.player && b.player.getLeaderboards ? b.player.getLeaderboards() : null;
+  /* ---------------- канал лидерборда (современный ysdk.leaderboards) -------- */
+  // Реальный API SDK (docs: sdk/sdk-leaderboard):
+  //   ysdk.leaderboards.setScore(name, score:number, extraData?:string)
+  //   ysdk.leaderboards.getEntries(name, {quantityTop, quantityAround, includeUser})
+  //     -> { entries: [{ score, extraData, rank, player:{ publicName, uniqueID } }], userRank }
+  //   ysdk.leaderboards.getPlayerEntry(name) -> entry
+  // ysdk.getLeaderboards() устарел, player.getLeaderboards() не существует.
+  //score = РЕЙТИНГ (виден в таблице), extraData = волна (технический канал
+  //гонки, строка). name таблицы обязан совпасть с полем «Техническое название
+  //лидерборда» в Консоли, иначе 404.
+  let lbApiPromise = null;
+  function leaderboardsApi() {
+    if (lbApiPromise) return lbApiPromise;
+    lbApiPromise = (async () => {
+      const s = window.NeonBridgeYandex && window.NeonBridgeYandex.sdk;
+      if (!s) return null;
+      const l = s.leaderboards;
+      if (l && typeof l.getEntries === "function" && typeof l.setScore === "function") return l;
+      if (typeof s.getLeaderboards === "function") { // деprecation-мост на всякий
+        try {
+          const old = await s.getLeaderboards();
+          if (old && typeof old.getLeaderboardEntries === "function") {
+            return {
+              getEntries: (n, o) => old.getLeaderboardEntries(n, o),
+              setScore: (n, v, x) => old.setLeaderboardScore(n, v, x),
+              getPlayerEntry: n => old.getLeaderboardPlayerEntry(n),
+            };
+          }
+        } catch (e) {}
+      }
+      return null;
+    })();
+    return lbApiPromise;
+  }
+  function duelAuthorized() {
+    try {
+      const p = window.NeonBridgeYandex && window.NeonBridgeYandex.player;
+      return !!p && (typeof p.isAuthorized !== "function" || p.isAuthorized());
+    } catch (e) { return false; }
   }
 
-  // Рейтинговая модель v59.16: в лидерборде score = РЕЙТИНГ (то, что видит
-  // таблица Яндекса), extraScore = волна последней синхронизации (технический
-  // канал гонки). extraScore старше версии без поля или null -> волна неизвестна.
-  function ratingOf(s) {
-    return Math.max(0, Math.round((s && (s.score ?? s.value ?? s.integerValue)) || 0));
+  function uidOf(e) {
+    try { return String((e && e.player && (e.player.uniqueID ?? e.player.uniqueId)) || "").toLowerCase(); } catch (err) { return ""; }
   }
-  function waveOf(s) {
-    if (!s || s.extraScore == null) return null;
-    const w = Math.round(+s.extraScore);
+  function ratingOf(e) {
+    return Math.max(0, Math.round(+(e && e.score) || 0));
+  }
+  function waveOf(e) {
+    if (!e || e.extraData == null) return null;
+    const w = parseInt(e.extraData, 10);
     return Number.isFinite(w) && w >= 0 ? w : null;
   }
   function myRating() {
@@ -159,38 +194,25 @@
   }
 
   async function findOnlineOpponent() {
-    const lb = bridgePlayer();
-    if (!lb || typeof lb.getScores !== "function") { duel.mode = "bot"; startBot(); renderPanel(); return; }
+    // Синхронный выход: моста/SDK нет вовсе (git-сборка до boot, file://) —
+    // заведомый бот без лишней вереницы микротасок.
+    if (!window.NeonBridgeYandex || !window.NeonBridgeYandex.sdk) { duel.mode = "bot"; startBot(); renderPanel(); return; }
+    const api = await leaderboardsApi();
+    if (!api || !duelAuthorized()) { duel.mode = "bot"; startBot(); renderPanel(); return; }
     try {
-      if (!duel.board) {
-        duel.board = window.NEON_DUEL_LB_CODE || null;
-        if (!duel.board && lb.getList) {
-          const list = await lb.getList();
-          duel.board = (list && list.leaderboardCodes && list.leaderboardCodes[0]) || null;
-        }
-      }
-      if (!duel.board) throw new Error("no leaderboard");
-      try { duel.myUid = window.NeonBridgeYandex.player.getUniqueID(); } catch (e) {}
-      // Окно подбора: ~10 мест вокруг своей позиции (если она известна),
-      // иначе верх таблицы.
-      let offset = 0;
-      if (typeof lb.getPlayerScore === "function") {
-        try {
-          const us = await lb.getPlayerScore(duel.board);
-          if (us && us.rank) offset = Math.max(0, us.rank - 11);
-        } catch (e) {}
-      }
-      const res = await lb.getScores(duel.board, { quantity: 20, offset });
-      const rows = (res && res.scores || [])
-        .map(r => r && r.score)
-        .filter(s => s && (!duel.myUid || !s.player || s.player.uniqueId !== duel.myUid));
+      duel.board = window.NEON_DUEL_LB_CODE || "neon_rating";
+      try { duel.myUid = String(window.NeonBridgeYandex.player.getUniqueID()).toLowerCase(); } catch (e) {}
+      // Верх таблицы + окно вокруг своей позиции: для новичка это топ,
+      // для крепкого середняка — свои «весовые».
+      const res = await api.getEntries(duel.board, { quantityTop: 10, quantityAround: 15, includeUser: true });
+      const rows = (res && res.entries || []).filter(e => uidOf(e) && uidOf(e) !== duel.myUid);
       if (!rows.length) throw new Error("empty board");
       // Матчмейкинг по рейтингу: ближайший к своему значению.
       const mine = myRating();
       rows.sort((a, b) => Math.abs(ratingOf(a) - mine) - Math.abs(ratingOf(b) - mine));
       const pick = rows[0];
       duel.opponent = {
-        uid: pick.player ? pick.player.uniqueId : null,
+        uid: uidOf(pick),
         name: (pick.player && pick.player.publicName) || "—",
         rating: ratingOf(pick),
         wave: waveOf(pick),
@@ -205,30 +227,32 @@
   }
 
   function pollOpponent() {
-    const lb = bridgePlayer();
-    if (!lb || !duel.board || !duel.opponent) return;
-    lb.getScores(duel.board, { quantity: 20 }).then(res => {
-      const row = (res && res.scores || [])
-        .map(r => r && r.score)
-        .find(s => s && s.player && s.player.uniqueId === duel.opponent.uid);
-      if (!row) return;
-      const wave = waveOf(row);
-      const rating = ratingOf(row);
-      if (wave !== duel.opponent.wave || rating !== duel.opponent.rating) duel.opponent.seenAt = Date.now();
-      duel.opponent.wave = wave;
-      duel.opponent.rating = rating;
-      duel.errors = 0;
-      renderPanel();
-    }).catch(() => {});
+    if (!duel.board || !duel.opponent) return;
+    leaderboardsApi().then(api => {
+      if (!api) return;
+      api.getEntries(duel.board, { quantityAround: 30, includeUser: true }).then(res => {
+        const row = (res && res.entries || []).find(e => uidOf(e) === duel.opponent.uid);
+        if (!row) return;
+        const wave = waveOf(row);
+        const rating = ratingOf(row);
+        if (wave !== duel.opponent.wave || rating !== duel.opponent.rating) duel.opponent.seenAt = Date.now();
+        duel.opponent.wave = wave;
+        duel.opponent.rating = rating;
+        duel.errors = 0;
+        renderPanel();
+      }).catch(() => {});
+    });
   }
 
   function pushRating() {
-    const lb = bridgePlayer();
-    if (!lb || !duel.board || typeof lb.setScore !== "function") return;
-    lb.setScore(duel.board, { score: myRating(), extraScore: duel.myWave }).then(() => {
-      duel.errors = 0;
-    }).catch(() => {
-      if (++duel.errors >= 3) { duel.mode = "bot"; duel.opponent = null; startBot(); }
+    if (!duel.board) return;
+    leaderboardsApi().then(api => {
+      if (!api) return;
+      api.setScore(duel.board, myRating(), String(Math.max(0, duel.myWave | 0))).then(() => {
+        duel.errors = 0;
+      }).catch(() => {
+        if (++duel.errors >= 3) { duel.mode = "bot"; duel.opponent = null; startBot(); }
+      });
     });
   }
 
@@ -285,8 +309,11 @@
     if (!ranked) { stopTimers(); renderPanel(); return; }
     duel.running = true;
     buildPanel();
-    if (bridgePlayer()) findOnlineOpponent();
-    else { duel.mode = "bot"; startBot(); }
+    refreshMenuButton();
+    // Оптимистично в «поиске» (yandex без соперника = «…»), findOnlineOpponent
+    // сам решит канал: современный API лидербордов или честный возврат в бота.
+    duel.mode = "yandex";
+    findOnlineOpponent();
     startTimers();
     renderPanel();
   };
