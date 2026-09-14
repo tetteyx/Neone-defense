@@ -30,6 +30,7 @@
   const GAME_SAVE_KEY = "neonBridgeDefenseSave_v5";
   const GAME_MAPS_KEY = "neonBridgeDefenseMaps_v1";
   const GAME_MAPS_DELETED_KEY = "neonBridgeDefenseMapsDeleted_v1";
+  const GAME_RATING_KEY = "neonBridgeDefenseRating_v1";
   const CORE_SCRIPT = "game-core.js";
   const ADAPTIVE_STYLE = "yandex.css";
   const FULLSCREEN_AD_COOLDOWN = 60000;
@@ -338,12 +339,22 @@
     if (!player) return;
 
     try {
-      const data = await player.getData([GAME_SAVE_KEY, `${GAME_MAPS_KEY}_cloud`]);
+      const data = await player.getData([GAME_SAVE_KEY, `${GAME_MAPS_KEY}_cloud`, GAME_RATING_KEY]);
       const cloudSave = data?.[GAME_SAVE_KEY];
       if (typeof cloudSave === "string" && cloudSave) {
         window.localStorage.setItem(GAME_SAVE_KEY, cloudSave);
         window.NeonGameBridge?.refreshMenu?.();
       }
+
+      // Рейтинг: облако перетягивает только если БОЛЬШЕ локального — свежая
+      // офлайн-сессия на этом устройстве не затирается старым облаком.
+      try {
+        const cloudRating = parseInt(data?.[GAME_RATING_KEY], 10);
+        const localRating = parseInt(window.localStorage.getItem(GAME_RATING_KEY), 10) || 0;
+        if (Number.isFinite(cloudRating) && cloudRating > localRating) {
+          window.localStorage.setItem(GAME_RATING_KEY, String(cloudRating));
+        }
+      } catch (e) {}
 
       // Пользовательские карты: объединение «локальные ∪ облачные» минус
       // удалённые. Локальные всегда приоритетнее — свежая редакторская карта
@@ -397,7 +408,7 @@
 
     storage.setItem = function (key, value) {
       nativeSetItem(key, value);
-      if (key === GAME_SAVE_KEY && typeof value === "string") {
+      if ((key === GAME_SAVE_KEY || key === GAME_RATING_KEY) && typeof value === "string") {
         player.setData({ [key]: value }, true).catch(() => {});
       }
     };

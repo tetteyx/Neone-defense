@@ -273,8 +273,9 @@ const COMBO_RADIUS = 92;
 const COMBO_CHECK_INTERVAL = 5;
 
 // DEV-режим: по клику открывает ВСЕ башни и модули поддержки (обход
-// волновых отпираний) — для быстрой отладки геймплея и комбо. Деньги не трогает.
+// волновых отпираний) + выдаёт бесконечные деньги для тестов. Вне платформы.
 let DEV_ALL_UNLOCKED = false;
+const TEST_MONEY = 999999999;
 
 /* =========================================================
     БАЛАНС — полностью перенесён из Onslaught 2.2 (slipcor/gaby):
@@ -523,6 +524,7 @@ const ADVANCED_TYPES = ["titan", "nova", "devastator", "singularity"];
 
 const state = {
   money: 300,
+  rating: 0,
   lives: 10,
 
   wave: 0,
@@ -799,6 +801,10 @@ function clamp(value, min, max) {
 }
 
 function spendMoney(amount) {
+  if (DEV_ALL_UNLOCKED) {
+    state.money = TEST_MONEY;
+    return;
+  }
   state.money -= amount;
 }
 
@@ -3025,6 +3031,7 @@ startGameBtn.addEventListener(
 if (devUnlockAllBtn) {
   devUnlockAllBtn.addEventListener("click", () => {
     DEV_ALL_UNLOCKED = !DEV_ALL_UNLOCKED;
+    if (DEV_ALL_UNLOCKED) state.money = TEST_MONEY;
     updateDevMoneyButton();
     updateTowerAvailability();
     updateUi();
@@ -4937,7 +4944,7 @@ function loadGame() {
     path = maps[currentMap].path;
     PATH_LENGTH = totalPathLength();
 
-    state.money = Number.isFinite(save.money) ? save.money : 170;
+    state.money = DEV_ALL_UNLOCKED ? TEST_MONEY : (Number.isFinite(save.money) ? save.money : 170);
     state.lives = Number.isFinite(save.lives) ? Math.max(0, Math.min(10, save.lives)) : 10;
     state.wave = Number.isFinite(save.wave) ? save.wave : 0;
     state.kills = Number.isFinite(save.kills) ? save.kills : 0;
@@ -4991,6 +4998,31 @@ function loadGame() {
    вместо «← Главное меню» — «🏳 Сдаться» с двухшаговым подтверждением
    (повторный клик за 4 с). Сдавшийся не сохраняет партию. Панель соперника
    (дуэль волн через лидерборд/призрака) активна только здесь. */
+// ── Рейтинг рейтингового боя ──────────────────────────────────────────────
+// Отдельный localStorage-ключ (не внутри сейва партии!): бой на game over не
+// должен пороывать «мёртвое» сохранение. Ключ проксируется в облако Яндекса
+// мостом game.js (neonBridgeDefenseRating_v1), рейтинг синхронизируется между
+// устройствами. duel.js читает/пишет через window.NeonRating.
+const RATING_KEY = "neonBridgeDefenseRating_v1";
+window.NeonRating = {
+  get() {
+    try {
+      return Math.max(0, parseInt(localStorage.getItem(RATING_KEY), 10) || 0);
+    } catch (e) {
+      return state.rating || 0;
+    }
+  },
+  add(delta) {
+    const next = Math.max(0, this.get() + (Math.round(delta) || 0));
+    try { localStorage.setItem(RATING_KEY, String(next)); } catch (e) {}
+    state.rating = next;
+    return next;
+  },
+};
+try { state.rating = window.NeonRating.get(); } catch (e) { state.rating = 0; }
+// duel.js построил кнопку-меню до загрузки core — перелинковываем подпись с рейтингом.
+try { window.NeonDuel && window.NeonDuel.refreshMenuButton && window.NeonDuel.refreshMenuButton(); } catch (e) {}
+
 let rankedSurrenderTimer = 0;
 
 function setRanked(on) {
@@ -5068,8 +5100,8 @@ function showMainMenu() {
 function updateDevMoneyButton() {
   if (!devUnlockAllBtn) return;
   devUnlockAllBtn.textContent = DEV_ALL_UNLOCKED
-    ? "DEV: ВСЕ БАШНИ — ВКЛ"
-    : "DEV: ВСЕ БАШНИ — ВЫКЛ";
+    ? "DEV: ВСЕ БАШНИ + ∞$ — ВКЛ"
+    : "DEV: ВСЕ БАШНИ + ∞$ — ВЫКЛ";
   devUnlockAllBtn.classList.toggle("active", DEV_ALL_UNLOCKED);
   devUnlockAllBtn.setAttribute("aria-pressed", String(DEV_ALL_UNLOCKED));
 }
@@ -5115,7 +5147,7 @@ function startNewGame() {
 function restartGame() {
   setGameOverUi(false);
   state.sessionId = state.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  state.money = 300;
+  state.money = DEV_ALL_UNLOCKED ? TEST_MONEY : 300;
   state.lives = 10;
 
   // Duel.js: новая партия — новый зачёт дуэли; панель активна только в рейтинге.

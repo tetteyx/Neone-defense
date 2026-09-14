@@ -7,7 +7,7 @@
    Реальный realtime-PvP на Яндекс.Играх недоступен: у платформы нет
    сокетов/матчмейкинга, а свои серверы правилами запрещены. Поэтому обмен
    живёт по LOW-FREQUENCY каналу — таблице лидеров:
-     · каждые PUSH_MS шлём setScore(value = текущая волна);
+     · каждые PUSH_MS шлём setScore(score = рейтинг, extraScore = волна);
      · каждые POLL_MS читаем getScores ищем соперника по uniqueId;
      · панель показывает его волну и разницу;
    «побеждает тот, кто дожил дольше» — на game over сравниваем финальные
@@ -25,6 +25,7 @@
   const POLL_MS = 10000;   // как часто читаем соперника
   const RENDER_MS = 900;   // перерисовка панели (и языка)
   const STALE_MS = 45000;  // соперник не двигается — «замолчал»
+  const RATING_STEP = 25;  // рейтинг за победу против человека (сдача = −25)
 
   const duel = {
     running: false,
@@ -108,8 +109,19 @@
       duel.panel.classList.remove("is-losing", "is-stale", "has-result");
       return;
     }
-    const oppWave = duel.opponent ? duel.opponent.wave : duel.bot.wave;
+    const oppWaveRaw = duel.opponent ? duel.opponent.wave : duel.bot.wave;
     const who = duel.opponent && duel.opponent.name ? duel.opponent.name : mode;
+    if (oppWaveRaw == null) {
+      // Волна соперника ещё не прилетела в extraScore — честно показываем прочерк.
+      t.wave.textContent = "—";
+      t.label.textContent = who;
+      duel.panel.classList.toggle("is-stale", true);
+      duel.panel.classList.toggle("is-losing", false);
+      duel.panel.classList.toggle("has-result", !!duel.result);
+      if (duel.result) t.label.textContent = duel.result;
+      return;
+    }
+    const oppWave = oppWaveRaw;
     t.wave.textContent = String(oppWave);
 
     const stale = duel.opponent && Date.now() - duel.opponent.seenAt > STALE_MS;
@@ -131,8 +143,19 @@
     return b && b.player && b.player.getLeaderboards ? b.player.getLeaderboards() : null;
   }
 
-  function scoreValue(s) {
-    return Math.max(0, Math.round((s && (s.value ?? s.integerValue ?? s.score)) || 0));
+  // Рейтинговая модель v59.16: в лидерборде score = РЕЙТИНГ (то, что видит
+  // таблица Яндекса), extraScore = волна последней синхронизации (технический
+  // канал гонки). extraScore старше версии без поля или null -> волна неизвестна.
+  function ratingOf(s) {
+    return Math.max(0, Math.round((s && (s.score ?? s.value ?? s.integerValue)) || 0));
+  }
+  function waveOf(s) {
+    if (!s || s.extraScore == null) return null;
+    const w = Math.round(+s.extraScore);
+    return Number.isFinite(w) && w >= 0 ? w : null;
+  }
+  function myRating() {
+    try { return window.NeonRating ? window.NeonRating.get() : 0; } catch (e) { return 0; }
   }
 
   async function findOnlineOpponent() {
@@ -148,19 +171,29 @@
       }
       if (!duel.board) throw new Error("no leaderboard");
       try { duel.myUid = window.NeonBridgeYandex.player.getUniqueID(); } catch (e) {}
-      const res = await lb.getScores(duel.board, { quantity: 20 });
+      // Окно подбора: ~10 мест вокруг своей позиции (если она известна),
+      // иначе верх таблицы.
+      let offset = 0;
+      if (typeof lb.getPlayerScore === "function") {
+        try {
+          const us = await lb.getPlayerScore(duel.board);
+          if (us && us.rank) offset = Math.max(0, us.rank - 11);
+        } catch (e) {}
+      }
+      const res = await lb.getScores(duel.board, { quantity: 20, offset });
       const rows = (res && res.scores || [])
         .map(r => r && r.score)
-        .filter(s => s && scoreValue(s) > 0 && (!duel.myUid || !s.player || s.player.uniqueId !== duel.myUid));
+        .filter(s => s && (!duel.myUid || !s.player || s.player.uniqueId !== duel.myUid));
       if (!rows.length) throw new Error("empty board");
-      // «рейтинговость»: берём случайного из ближних по волне к вершине
-      rows.sort((a, b) => scoreValue(b) - scoreValue(a));
-      const pool = rows.slice(0, Math.max(3, Math.ceil(rows.length / 2)));
-      const pick = pool[Math.floor(Math.random() * pool.length)];
+      // Матчмейкинг по рейтингу: ближайший к своему значению.
+      const mine = myRating();
+      rows.sort((a, b) => Math.abs(ratingOf(a) - mine) - Math.abs(ratingOf(b) - mine));
+      const pick = rows[0];
       duel.opponent = {
         uid: pick.player ? pick.player.uniqueId : null,
         name: (pick.player && pick.player.publicName) || "—",
-        wave: scoreValue(pick),
+        rating: ratingOf(pick),
+        wave: waveOf(pick),
         seenAt: Date.now(),
       };
       duel.mode = "yandex";
@@ -179,18 +212,20 @@
         .map(r => r && r.score)
         .find(s => s && s.player && s.player.uniqueId === duel.opponent.uid);
       if (!row) return;
-      const wave = scoreValue(row);
-      if (wave !== duel.opponent.wave || !duel.opponent.seenAt) duel.opponent.seenAt = Date.now();
+      const wave = waveOf(row);
+      const rating = ratingOf(row);
+      if (wave !== duel.opponent.wave || rating !== duel.opponent.rating) duel.opponent.seenAt = Date.now();
       duel.opponent.wave = wave;
+      duel.opponent.rating = rating;
       duel.errors = 0;
       renderPanel();
     }).catch(() => {});
   }
 
-  function pushWave() {
+  function pushRating() {
     const lb = bridgePlayer();
     if (!lb || !duel.board || typeof lb.setScore !== "function") return;
-    lb.setScore(duel.board, { value: duel.myWave }).then(() => {
+    lb.setScore(duel.board, { score: myRating(), extraScore: duel.myWave }).then(() => {
       duel.errors = 0;
     }).catch(() => {
       if (++duel.errors >= 3) { duel.mode = "bot"; duel.opponent = null; startBot(); }
@@ -230,7 +265,7 @@
 
   function startTimers() {
     stopTimers();
-    duel.pushTimer = setInterval(() => { if (duel.mode === "yandex") pushWave(); }, PUSH_MS);
+    duel.pushTimer = setInterval(() => { if (duel.mode === "yandex") pushRating(); }, PUSH_MS);
     duel.pollTimer = setInterval(() => { if (duel.mode === "yandex") pollOpponent(); }, POLL_MS);
     duel.renderTimer = setInterval(() => { loop(); renderPanel(); }, RENDER_MS);
   }
@@ -265,23 +300,47 @@
     duel.running = false;
     stopTimers();
     duel.myWave = Math.max(duel.myWave, finalWave || duel.myWave);
-    const oppWave = duel.opponent ? duel.opponent.wave : (duel.bot ? duel.bot.wave : 0);
-    if (surrendered) duel.result = T("ui.duelSurrendered");
-    else if (duel.myWave > oppWave) duel.result = T("ui.duelWin", { a: duel.myWave, b: oppWave });
-    else if (duel.myWave < oppWave) duel.result = T("ui.duelLose", { a: duel.myWave, b: oppWave });
-    else duel.result = T("ui.duelDraw");
+    const oppWaveRaw = duel.opponent ? duel.opponent.wave : (duel.bot ? duel.bot.wave : null);
+    const oppWave = oppWaveRaw == null ? duel.myWave : oppWaveRaw; // неизвестно -> «волна в волну»
+    // Рейтингованная партия — только человек против человека (живой лидерборд).
+    const rated = duel.mode === "yandex" && !!duel.opponent;
+    const base = surrendered ? T("ui.duelSurrendered")
+      : duel.myWave > oppWave ? T("ui.duelWin", { a: duel.myWave, b: oppWave })
+      : duel.myWave < oppWave ? T("ui.duelLose", { a: duel.myWave, b: oppWave })
+      : T("ui.duelDraw");
+    let delta = 0;
+    if (rated && oppWaveRaw != null) {
+      if (surrendered || duel.myWave < oppWave) delta = -RATING_STEP;
+      else if (duel.myWave > oppWave) delta = RATING_STEP;
+    }
+    if (delta) {
+      try { window.NeonRating && window.NeonRating.add(delta); } catch (e) {}
+      duel.result = base + " · " + (delta > 0 ? "+" : "") + delta + " " + T("ui.ratingWord");
+      pushRating(); // таблица обновляется сразу, не дожидаясь тика
+    } else {
+      duel.result = rated ? base : base + " · " + T("ui.duelUnrated");
+    }
     renderPanel();
+    refreshMenuButton();
   };
 
   /* ---------------- кнопка в меню ---------------- */
+  function rankedLabel() {
+    try { return T("ui.rankedBtn", { rating: myRating() }); } catch (e) { return "⚔ Рейтинговый бой"; }
+  }
+  function refreshMenuButton() {
+    if (duel.menuBtn) duel.menuBtn.textContent = rankedLabel();
+  }
+  duel.refreshMenuButton = refreshMenuButton;
   function buildMenuButton() {
     const startBtn = document.getElementById("startGameBtn");
     if (!startBtn || duel.menuBtn) return;
-    const btn = makeEl("button", "menu-ranked", T("ui.rankedBtn"));
+    const btn = makeEl("button", "menu-ranked", rankedLabel());
     btn.id = "rankedBattleBtn";
     btn.type = "button";
-    // Перевод при смене языка: applyDom() i18n.js перезапишет по атрибуту.
-    btn.setAttribute("data-i18n", "ui.rankedBtn");
+    // data-i18n НЕ вешаем: в подписи живое число рейтинга, его пишет duel.js
+    // (при смене языка текст вернётся через applyDom->перезапуск меню не нужен:
+    //  кнопка перелинковывается refreshMenuButton по тикам и после боёв).
     btn.addEventListener("click", () => {
       // core.startRankedGame — глобальная функция game-core.js
       if (typeof startRankedGame === "function") startRankedGame();
@@ -295,6 +354,8 @@
   } else {
     buildMenuButton();
   }
+  // Смена языка: у кнопки нет data-i18n (в подписи рейтинг) — перелинковка по hook.
+  try { window.NeonI18N && window.NeonI18N.onChange(refreshMenuButton); } catch (e) {}
 
   // Хуки для автотестов (harness.js): прокрутка призрака без реальных таймеров.
   duel.testHooks = {
