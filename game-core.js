@@ -291,8 +291,11 @@ const TEST_MONEY = 999999999;
       unlockKills                 — отпирать по НАКОПЛЕННЫМ УБИЙСТВАМ (как в оригинале),
                                     а не по номеру волны.
     Адаптированные (в оригинале не документированы поминутно): rail, цены
-    апгрейдов продвинутых турелей, награды за фраги (0.5×HP волны), стартовые
-    деньги ($300). Всё остальное — дословные числа Onslaught 2.2.
+    апгрейдов продвинутых турелей, стартовые деньги ($300). Награда за фрага —
+    линейно по номеру волны (моб на волне N = $N), как в оригинале. Комбо и
+    мины нанесают фиксированный урон от прокачки башни, а НЕ процент от maxHp
+    врага (иначе одна башня «стирала» поздние волны и печатала деньги).
+    Всё остальное — дословные числа Onslaught 2.2.
 ========================================================= */
 const towerTypes = {
   booster: {
@@ -392,7 +395,7 @@ const towerTypes = {
 
   blast: {
     name: "Разлом",
-    cost: 175,
+    cost: 200,
     color: "#df6a5f",
     projectileSpeed: 380,
     rofK: 65,
@@ -404,7 +407,7 @@ const towerTypes = {
     upgRng: [35, 80, 160, 400, 900, 1100, 1300, 1500],
     upgRate: [30, 60, 115, 200, 340, 600, 900, 1050, 1150],
     holding: true,           // « Holding Pattern»: 3 апдейса дальности + 3 темпа
-    splash: 55,
+    splash: 44,
     damage: 50, range: 190, fireRate: 1.3,
     description: "урон по области",
     combo: { chance: 0.35, cooldown: 6, name: "Метеор", description: "35% шанс вызвать мощный взрыв на случайном участке дороги" }
@@ -505,7 +508,7 @@ const towerTypes = {
     upgRng: [700, 1400, 2800],
     upgRate: [900, 1800],
     absorbs: true,           // +30% урона каждой «в максимум» базовой турели рядом
-    splash: 105,
+    splash: 70,
     damage: 150000, range: 320, fireRate: 2.8,
     description: "копирует мощь прокачанных соседей",
     combo: { chance: 0.15, cooldown: 10, name: "Сингулярность", description: "15% шанс создать чёрную дыру, разрушающую строй врагов" }
@@ -1710,21 +1713,34 @@ function updateProjectile(projectile, dt) {
 
   if (!projectile.target || projectile.target.dead) {
     if (holder) {
-      const candidate = state.enemies.find(enemy =>
-          !enemy.dead && distance(enemy, holder) <= projectile.holdRange);
-      if (candidate) {
-        projectile.target = candidate;
-        projectile.orbit = undefined;
-        projectile.holdAge = 0;
-      } else {
-        if (projectile.orbit === undefined) {
-          projectile.orbit = Math.atan2(projectile.y - holder.y, projectile.x - holder.x);
+      if (projectile.orbit === undefined) {
+        // Промахнувшийся снаряд превращается в «ждущую» ракету.
+        const orbiting = state.projectiles.filter(p =>
+            !p.dead && p.holdTower === holder && p.orbit !== undefined).length;
+        if (orbiting >= 3) {
+          projectile.dead = true;
+          return;
         }
+        projectile.orbit = Math.atan2(projectile.y - holder.y, projectile.x - holder.x);
+        projectile.holdAge = 0;
+      }
+      const fresh = state.enemies.find(enemy =>
+          !enemy.dead && distance(enemy, holder) <= projectile.holdRange);
+      if (fresh) {
+        // Ждущая ракета нашла цель: бьёт вполовину слабее и без splash —
+        // это спасённый промах, а не бесплатный второй залп.
+        projectile.target = fresh;
+        projectile.damage = Math.round(projectile.damage * 0.5);
+        projectile.splash = 0;
+        projectile.orbit = undefined;
+      } else {
         projectile.orbit += 2.6 * dt;
         projectile.x = holder.x + Math.cos(projectile.orbit) * 34;
         projectile.y = holder.y + Math.sin(projectile.orbit) * 34;
         projectile.holdAge = (projectile.holdAge || 0) + dt;
-        if (projectile.holdAge > 60) projectile.dead = true;
+        // В оригинале залп «держится» недолго: через несколько секунд
+        // неиспользованная ракета гаснет.
+        if (projectile.holdAge > 6) projectile.dead = true;
         return;
       }
     } else {
@@ -1778,17 +1794,21 @@ function hitTarget(projectile, target) {
   }
 
   if (projectile.splash) {
-    for (const enemy of state.enemies) {
-      if (
-          enemy !== target &&
-          !enemy.dead &&
-          distance(enemy, target) <= projectile.splash
-      ) {
-        enemy.hp -= projectile.damage * 0.55;
+    // AoE ограничен: максимум 5 ближайших целей и 50% урона — чтобы один
+    // AoE-выстрел не зачищал всю колонну и не превращался в денежный принтер.
+    const victims = state.enemies
+        .filter(enemy =>
+            enemy !== target &&
+            !enemy.dead &&
+            distance(enemy, target) <= projectile.splash)
+        .sort((a, b) => distance(a, target) - distance(b, target))
+        .slice(0, 5);
 
-        if (enemy.hp <= 0) {
-          killEnemy(enemy);
-        }
+    for (const enemy of victims) {
+      enemy.hp -= projectile.damage * 0.5;
+
+      if (enemy.hp <= 0) {
+        killEnemy(enemy);
       }
     }
 
@@ -1936,7 +1956,7 @@ function getRandomRoadPoint(minRatio = 0.12, maxRatio = 0.88) {
   return getPointOnPath(PATH_LENGTH * ratio);
 }
 
-function createComboMine(x, y, color) {
+function createComboMine(x, y, color, damage) {
   state.mines.push({
     x,
     y,
@@ -1944,6 +1964,8 @@ function createComboMine(x, y, color) {
     life: 18,
     maxLife: 18,
     color,
+    // Onslaught: мина — это урон, а не «гарантированная смерть».
+    damage: Math.max(1, Math.round(damage || 0)),
     armed: true,
     pulse: 0
   });
@@ -1951,6 +1973,7 @@ function createComboMine(x, y, color) {
 }
 
 function launchComboMine(tower, target, color) {
+  const d = getTowerStats(tower).damage;
   state.comboProjectiles.push({
     x: tower.x,
     y: tower.y,
@@ -1960,6 +1983,7 @@ function launchComboMine(tower, target, color) {
     targetY: target.y,
     progress: 0,
     duration: 0.55,
+    damage: d * 3,
     color,
     dead: false
   });
@@ -1978,7 +2002,7 @@ function updateComboProjectiles(dt) {
     projectile.y = projectile.startY + (projectile.targetY - projectile.startY) * t - arc;
 
     if (t >= 1 && !projectile.dead) {
-      createComboMine(projectile.targetX, projectile.targetY, projectile.color);
+      createComboMine(projectile.targetX, projectile.targetY, projectile.color, projectile.damage);
       projectile.dead = true;
     }
   }
@@ -1993,6 +2017,13 @@ function triggerCombo(group) {
   // Комбо не является паузой: оно выполняется внутри обычного игрового тика.
   // Сохраняем состояние паузы и гарантируем, что само срабатывание комбо его не меняет.
 
+  // Баланс Onslaught: комбо-урон привязан к ФАКТИЧЕСКОЙ прокачке башни
+  // (getTowerStats), а не к здоровью врага. Процент от maxHp — это вечный
+  // «стёр-кнопка»: одна башня выигрывала любые поздние волны и печатала
+  // деньги. Теперь сила комбо растёт только вместе с апгрейдами и упирается
+  // в потолок, как обычные выстрелы.
+  const d = getTowerStats(tower).damage;
+
   if (tower.type === "pulse") {
     const p = getRandomRoadPoint();
     launchComboMine(tower, p, type.color);
@@ -2006,7 +2037,7 @@ function triggerCombo(group) {
   } else if (tower.type === "rail") {
     const targets = state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 4);
     for (const enemy of targets) {
-      enemy.hp -= towerTypes.rail.damage * 2.2;
+      enemy.hp -= d * 1.6;
       createLightning(tower, enemy);
       if (enemy.hp <= 0) killEnemy(enemy);
     }
@@ -2017,7 +2048,7 @@ function triggerCombo(group) {
     for (const enemy of state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 7)) {
       enemy.slowMultiplier = 0.08;
       enemy.slowTimer = 3.5;
-      enemy.hp -= towerTypes.frost.damage * 3;
+      enemy.hp -= d * 1.2;
       if (enemy.hp <= 0) killEnemy(enemy);
     }
     state.effects.push({ type: "comboBurst", x: tower.x, y: tower.y, radius: 110, life: 0.5, maxLife: 0.5, color: type.color });
@@ -2029,7 +2060,7 @@ function triggerCombo(group) {
     state.effects.push({ type: "comboBurst", x: p.x, y: p.y, radius: 125, life: 0.55, maxLife: 0.55, color: type.color });
     for (const enemy of state.enemies) {
       if (!enemy.dead && distance(enemy, p) <= 105) {
-        enemy.hp -= Math.max(80, enemy.maxHp * 0.72);
+        enemy.hp -= d * 1.8;
         if (enemy.hp <= 0) killEnemy(enemy);
       }
     }
@@ -2039,7 +2070,7 @@ function triggerCombo(group) {
   if (tower.type === "arc") {
     const targets = state.enemies.filter(e => !e.dead).sort((a,b) => b.distance - a.distance).slice(0, 6);
     for (const enemy of targets) {
-      enemy.hp -= towerTypes.arc.damage * 4.5;
+      enemy.hp -= d * 1.4;
       createLightning(tower, enemy);
       if (enemy.hp <= 0) killEnemy(enemy);
     }
@@ -2051,7 +2082,7 @@ function triggerCombo(group) {
     if (!target) return;
     for (const enemy of state.enemies) {
       if (!enemy.dead && distance(enemy, target) <= 115) {
-        enemy.hp -= towerTypes.titan.damage * 2.8;
+        enemy.hp -= d * 1.5;
         if (enemy.hp <= 0) killEnemy(enemy);
       }
     }
@@ -2062,7 +2093,7 @@ function triggerCombo(group) {
   if (tower.type === "nova") {
     for (const enemy of state.enemies) {
       if (!enemy.dead) {
-        enemy.hp -= enemy.maxHp * 0.42;
+        enemy.hp -= d * 0.5;
         if (enemy.hp <= 0) killEnemy(enemy);
       }
     }
@@ -2073,7 +2104,7 @@ function triggerCombo(group) {
   if (tower.type === "devastator") {
     for (const enemy of state.enemies) {
       if (!enemy.dead) {
-        enemy.hp -= enemy.maxHp * 0.58;
+        enemy.hp -= d * 1.0;
         if (enemy.hp <= 0) killEnemy(enemy);
       }
     }
@@ -2084,7 +2115,7 @@ function triggerCombo(group) {
   if (tower.type === "singularity") {
     for (const enemy of state.enemies) {
       if (!enemy.dead) {
-        enemy.hp -= enemy.maxHp * 0.75;
+        enemy.hp -= d * 1.2;
         enemy.slowMultiplier = 0.12;
         enemy.slowTimer = 4;
         if (enemy.hp <= 0) killEnemy(enemy);
@@ -2145,8 +2176,10 @@ function updateMines(dt) {
       mine.armed = false;
       const targets = victims.sort((a, b) => b.distance - a.distance);
       for (const enemy of targets) {
-        enemy.hp = 0;
-        killEnemy(enemy);
+        enemy.hp -= mine.damage;
+        if (enemy.hp <= 0) {
+          killEnemy(enemy);
+        }
       }
       createExplosion(mine.x, mine.y, mine.color);
       state.effects.push({ type: "comboBurst", x: mine.x, y: mine.y, radius: 90, life: 0.45, maxLife: 0.45, color: mine.color });
