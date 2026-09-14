@@ -2910,6 +2910,91 @@ function setPanelCategory(category) {
 towersTab?.addEventListener("click", () => setPanelCategory("towers"));
 boostsTab?.addEventListener("click", () => setPanelCategory("boosts"));
 
+/* =========================================================
+   ПОДСКАЗКА-ОПИСАНИЕ (v59.19): полный текст башни по наведению
+   над карточкой. Тач-устройства (hover:none) не получают поповер —
+   там описание видно в selectionInfo после выбора.
+========================================================= */
+
+const towerTipEl = document.createElement("div");
+towerTipEl.className = "tower-tip";
+towerTipEl.hidden = true;
+try { document.body.appendChild(towerTipEl); } catch (e) {}
+let towerTipCard = null;
+let towerTipKids = [];
+
+function clearTowerTip() {
+  towerTipKids.forEach(k => {
+    try { towerTipEl.removeChild(k); } catch (e) {}
+  });
+  towerTipKids = [];
+}
+
+function hideTowerTip() {
+  towerTipCard = null;
+  clearTowerTip();
+  towerTipEl.hidden = true;
+}
+
+function showTowerTip(card) {
+  if (!card || card === towerTipCard && !towerTipEl.hidden) return;
+  // только десктоп с курсором; в песочницах тестов matchMedia может не быть
+  try {
+    if (window.matchMedia && !window.matchMedia("(hover: hover)").matches) return;
+  } catch (e) {}
+  const type = card.dataset && card.dataset.tower;
+  const def = type && towerTypes[type];
+  if (!def) return;
+  const lines = [];
+  if (isTowerUnlocked(type)) {
+    const head = [def.name];
+    if (def.cost) head.push("$" + def.cost);
+    lines.push(head.join(" · "));
+    if (def.description) lines.push(def.description);
+    if (def.combo) lines.push(def.combo.name + ": " + def.combo.description);
+  } else {
+    lines.push("???");
+    lines.push(tl("ui.tipUnlockWave", { n: def.unlockWave || 0 }));
+  }
+  towerTipCard = card;
+  clearTowerTip();
+  lines.forEach(s => {
+    const p = document.createElement("div");
+    p.textContent = s;
+    towerTipKids.push(p);
+    towerTipEl.appendChild(p);
+  });
+  towerTipEl.hidden = false;
+  try {
+    const r = card.getBoundingClientRect();
+    const tw = towerTipEl.offsetWidth || 200;
+    const th = towerTipEl.offsetHeight || 60;
+    let left = r.left + r.width / 2 - tw / 2;
+    left = Math.max(6, Math.min(left, (window.innerWidth || 1280) - tw - 6));
+    let top = r.top - th - 8;
+    if (top < 4) top = r.bottom + 8; // над карточкой нет места — под неё
+    towerTipEl.style.left = left + "px";
+    towerTipEl.style.top = top + "px";
+  } catch (e) {}
+}
+
+function towerTipFromEvent(e) {
+  const card = e && e.target && e.target.closest ? e.target.closest(".tower-card") : null;
+  if (card) showTowerTip(card); else hideTowerTip();
+}
+
+towerList.addEventListener("pointerover", towerTipFromEvent);
+towerList.addEventListener("pointerleave", hideTowerTip);
+towerList.addEventListener("click", hideTowerTip);
+towerList.addEventListener("scroll", hideTowerTip);
+if (boostList) {
+  boostList.addEventListener("pointerover", towerTipFromEvent);
+  boostList.addEventListener("pointerleave", hideTowerTip);
+  boostList.addEventListener("click", hideTowerTip);
+  boostList.addEventListener("scroll", hideTowerTip);
+}
+window.__towerTip = { show: showTowerTip, hide: hideTowerTip, el: towerTipEl };
+
 
 /* =========================================================
    КНОПКИ
@@ -4756,32 +4841,48 @@ function endGame(win) {
   state.waveActive = false;
   state.spawning = false;
 
-  if (win) {
-    endTitle.textContent = tl("end.victoryTitle");
-    endText.textContent = tl("end.victoryText", { n: state.maxWaves, k: state.kills });
-  } else if (state.ranked && state.rankedSurrendered) {
-    endTitle.textContent = tl("ranked.surrenderTitle");
-    endText.textContent = tl("ranked.surrenderText", { n: state.wave });
-  } else {
-    ensureAudio();
-    playDefeatSound();
-    endTitle.textContent = tl("end.gameoverTitle");
-    endText.textContent = tl("end.gameoverText", { k: state.kills });
-  }
-
-  // Рейтинговый бой: на финале — волна и рейтинг С ДЕЛЬТОЙ боя
-  // («Рейтинг: 40 (−25)»); дельту считает duel.js (включая ранний замок).
+  // Рейтинговый бой: итог дуэли на экране финала — «РАУНД ВЫИГРАН» зелёным,
+  // «РАУНД ПРОИГРАН» красным, ничья золотом; ниже — волна и «Рейтинг: N (±25)».
+  // Исход (duelOutcome) и дельту (lastDelta) считает duel.js — вместе с ранней
+  // победой, которая завершает партию сразу через NeonDuelFinish.
+  let rankedShown = false;
   if (state.ranked) {
     try {
-      const d = Math.round((window.NeonDuel && window.NeonDuel.lastDelta) || 0);
-      const r = window.NeonRating ? window.NeonRating.get() : (state.rating || 0);
-      const ratingLine = tl("ranked.ratingLine", { n: r }) + (d ? " (" + (d > 0 ? "+" : "") + d + ")" : "");
-      if (!win && !state.rankedSurrendered) {
-        endText.textContent = tl("ranked.waveText", { n: state.wave }) + "\n" + ratingLine;
-      } else {
-        endText.textContent = endText.textContent + "\n" + ratingLine;
+      const du = window.NeonDuel;
+      const delta = Math.round((du && du.lastDelta) || 0);
+      const rating = window.NeonRating ? window.NeonRating.get() : (state.rating || 0);
+      const outcome = state.rankedSurrendered ? "lose"
+        : ((du && du.duelOutcome) || (delta > 0 ? "win" : delta < 0 ? "lose" : "draw"));
+      endTitle.classList.remove("res-win", "res-lose", "res-draw");
+      endTitle.classList.add("res-" + outcome);
+      endTitle.textContent = outcome === "win" ? tl("ranked.winTitle")
+        : outcome === "draw" ? tl("ranked.drawTitle")
+        : (state.rankedSurrendered ? tl("ranked.surrenderTitle") : tl("ranked.loseTitle"));
+      const ratingLine = tl("ranked.ratingLine", { n: rating }) + (delta ? " (" + (delta > 0 ? "+" : "") + delta + ")" : "");
+      endText.textContent = (state.rankedSurrendered
+        ? tl("ranked.surrenderText", { n: state.wave })
+        : tl("ranked.waveText", { n: state.wave })) + "\n" + ratingLine;
+      if (outcome !== "win") {
+        ensureAudio();
+        playDefeatSound();
       }
-    } catch (e) {}
+      rankedShown = true;
+    } catch (e) {
+      rankedShown = false;
+    }
+  }
+
+  if (!rankedShown) {
+    endTitle.classList.remove("res-win", "res-lose", "res-draw");
+    if (win) {
+      endTitle.textContent = tl("end.victoryTitle");
+      endText.textContent = tl("end.victoryText", { n: state.maxWaves, k: state.kills });
+    } else {
+      ensureAudio();
+      playDefeatSound();
+      endTitle.textContent = tl("end.gameoverTitle");
+      endText.textContent = tl("end.gameoverText", { k: state.kills });
+    }
   }
 
   setGameOverUi(true);
@@ -4792,6 +4893,14 @@ function endGame(win) {
   // Запрос оценки игры (sdk-review) после завершённой партии.
   try { window.NeonBridgeYandex && window.NeonBridgeYandex.requestReview && window.NeonBridgeYandex.requestReview(); } catch (e) {}
 }
+
+// v59.19: ранняя победа в дуэли завершает партию СРАЗУ (хук duel.js после
+// замка результата: рейтинг начислен, зелёный финал — не дожидаясь game over).
+window.NeonDuelFinish = function () {
+  if (state.ranked && !state.gameOver) {
+    endGame(true);
+  }
+};
 
 function selectDifficulty(difficultyId) {
   if (!difficulties[difficultyId]) {
@@ -5255,6 +5364,10 @@ function restartGame() {
       tl("hint.pickTowerStart")
   );
 
+  // v59.19: перечитать доступность на wave=0 — иначе после прошлой партии
+  // открытые башни «появляются все и сразу» до первой волны новой игры.
+  updateTowerAvailability();
+
   updateUi();
 }
 
@@ -5268,6 +5381,7 @@ mergeCustomMaps();
 renderMapCards();
 selectDifficulty(currentDifficulty);
 selectMap(currentMap);
+try { updateTowerAvailability(); } catch (e) {}
 
 setHint(
     tl("hint.pickTowerStart")

@@ -631,6 +631,16 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .duel-panel.is-won .duel-label{color:var(--cm-leaf)}
 /* Финал рейтингового боя: «дошли до волны» + «Рейтинг: N (±25)» — построчно */
 #endText{white-space:pre-line}
+/* Итог дуэли красится по исходу: победа — зелёный, поражение — красный, ничья — золотой */
+#endTitle.res-win{color:var(--cm-leaf)!important}
+#endTitle.res-lose{color:var(--cm-coral)!important}
+#endTitle.res-draw{color:var(--cm-gold)!important}
+/* Подсказка-описание башни по наведению (v59.19): всплывает над карточкой,
+   показывает полное описание + комбо (в карточке текст обрезан троеточием). */
+.tower-tip{position:fixed;z-index:80;max-width:250px;padding:8px 11px;border:1px solid rgba(232,182,76,.5);border-radius:10px;background:rgba(15,19,31,.97);box-shadow:var(--cm-raised-shadow);color:var(--cm-cream);font-family:var(--cm-font-body);font-size:11.5px;line-height:1.45;pointer-events:none;text-align:left}
+.tower-tip[hidden]{display:none}
+.tower-tip div+div{margin-top:3px}
+.tower-tip div:first-child{font-family:var(--cm-font-mono);font-weight:800;font-size:11px;letter-spacing:.04em;color:var(--cm-gold)}
 /* «Тайные» (неволновые) башни в рейтинговом бою скрыты целиком, а не «???» */
 .ranked-mode .tower-card.locked{display:none!important}
 .menu-ranked{grid-column:1/-1;justify-self:center;display:inline-block;margin:6px auto 0;min-height:36px;padding:8px 20px;border:1px solid rgba(232,182,76,.5);border-radius:999px;background:rgba(232,182,76,.08);color:var(--cm-gold);font-family:var(--cm-font-mono);font-weight:800;font-size:.78rem;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;transition:background .15s ease,transform .15s ease}

@@ -32,7 +32,7 @@
   const RENDER_MS = 900;    // перерисовка панели / тик призрака
   const STALE_MS = 45000;   // соперник молчит дольше — гасим индикатор
   const RATING_STEP = 25;   // рейтинг за победу против человека (сдача = −25)
-  const WIN_LOCK_MS = 35000; // тишины в волне соперника = «партию он закончил»
+  const WIN_LOCK_MS = 20000; // тишины в волне соперника = «партию он закончил»
 
   const duel = {
     running: false,
@@ -47,6 +47,7 @@
     lastDelta: 0,            // дельта рейтинга за бой (0 для нерейтинговых)
     wonEarly: false,         // победа зафиксирована до game over
     ratingApplied: false,
+    duelOutcome: null,       // "win" | "lose" | "draw" — экран финала красит итог
     pushTimer: null,
     pollTimer: null,
     renderTimer: null,
@@ -170,8 +171,12 @@
     if (Date.now() - duel.oppLastChange < WIN_LOCK_MS) return;
     // Соперник молчит на своей финальной волне, а мы её пережили — победа.
     duel.wonEarly = true;
+    duel.duelOutcome = "win";
     duel.result = T("ui.duelWinLocked", { b: duel.opponent.wave });
     applyRating(RATING_STEP);
+    // v59.19: бой не ждут до своей смерти — партия завершается СРАЗУ,
+    // экран финала зелёный (core: NeonDuelFinish -> endGame).
+    try { window.NeonDuelFinish && window.NeonDuelFinish(); } catch (e) {}
   }
 
   function renderPanel() {
@@ -386,6 +391,7 @@
     duel.oppLastChange = 0;
     duel.lastDelta = 0;
     duel.wonEarly = false;
+    duel.duelOutcome = null;
     duel.ratingApplied = false;
     duel.errors = 0;
     duel.running = false;
@@ -431,6 +437,8 @@
       if (surrendered || duel.myWave < oppWave) delta = -RATING_STEP;
       else if (duel.myWave > oppWave) delta = RATING_STEP;
     }
+    duel.duelOutcome = surrendered ? "lose"
+      : duel.myWave > oppWave ? "win" : duel.myWave < oppWave ? "lose" : "draw";
     if (delta) {
       applyRating(delta);
       duel.result = base + " · " + (delta > 0 ? "+" : "") + delta + " " + T("ui.ratingWord");
