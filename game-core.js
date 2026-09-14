@@ -297,38 +297,40 @@ const TEST_MONEY = 999999999;
     Всё остальное — дословные числа Onslaught 2.2.
 ========================================================= */
 const towerTypes = {
+  // v59.20: «тайные» башни и усилители — сетка открытия каждые 30 волн
+  // (30/60/…/330) и цена по той же дуге: до 30-й видна только база (5 башен).
   booster: {
-    name: "Усилитель", cost: 1150, unlockWave: 5, damage: 0, range: 145, fireRate: 999, color: "#74c476",
+    name: "Усилитель", cost: 2400, unlockWave: 120, damage: 0, range: 145, fireRate: 999, color: "#74c476",
     description: "+40% урон (Damage+)",
     support: { dmgPct: 0.40 }
   },
   overcharger: {
-    name: "Разгонщик", cost: 1800, unlockWave: 11, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
+    name: "Разгонщик", cost: 3000, unlockWave: 150, damage: 0, range: 120, fireRate: 999, color: "#5b9fd6",
     description: "+120% скорость (Rate+)",
     support: { ratePct: 1.20 }
   },
   range_amp: {
-    name: "Дальний модуль", cost: 650, unlockWave: 3, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
+    name: "Дальний модуль", cost: 900, unlockWave: 30, damage: 0, range: 175, fireRate: 999, color: "#8fd0e8",
     description: "+100% радиус (Range+)",
     support: { rngPct: 1.00 }
   },
   reactor: {
-    name: "Реактор", cost: 2800, unlockWave: 14, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
+    name: "Реактор", cost: 4600, unlockWave: 210, damage: 0, range: 155, fireRate: 999, color: "#e8b64c",
     description: "+100% урон (Damage++)",
     support: { dmgPct: 1.00 }
   },
   nexus: {
-    name: "Нексус", cost: 2300, unlockWave: 16, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
+    name: "Нексус", cost: 3800, unlockWave: 180, damage: 0, range: 210, fireRate: 999, color: "#eec76a",
     description: "+100% урон, −30% радиус и скорость (Big Dmg Exch.)",
     support: { dmgPct: 1.00, rngPct: -0.30, ratePct: -0.30 }
   },
   rate_xchg: {
-    name: "Частотник", cost: 900, unlockWave: 7, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
+    name: "Частотник", cost: 1400, unlockWave: 60, damage: 0, range: 120, fireRate: 999, color: "#e8a04c",
     description: "+60% скорость, −40% урон, −10% радиус (Rate Exch.)",
     support: { ratePct: 0.60, dmgPct: -0.40, rngPct: -0.10 }
   },
   range_xchg: {
-    name: "Ретранслятор", cost: 1100, unlockWave: 9, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
+    name: "Ретранслятор", cost: 1900, unlockWave: 90, damage: 0, range: 160, fireRate: 999, color: "#cf8e97",
     description: "+100 радиус, −25% скорость (Range Exch.)",
     support: { rngFlat: 100, ratePct: -0.25 }
   },
@@ -434,8 +436,8 @@ const towerTypes = {
   // ── ПРОДВИНУТЫЕ: Sniper / Fusion / Railgun / Combonly (цена и $ из FAQ) ──
   titan: {
     name: "Титан",
-    cost: 4000,
-    unlockWave: 12,
+    cost: 8200,
+    unlockWave: 300,
     color: "#e08b52",
     projectileSpeed: 760,
     rofK: 170,
@@ -455,8 +457,8 @@ const towerTypes = {
 
   nova: {
     name: "Нова",
-    cost: 4400,
-    unlockWave: 14,
+    cost: 9800,
+    unlockWave: 330,
     color: "#eef1f7",
     projectileSpeed: 1400,
     rofK: 150,
@@ -475,8 +477,8 @@ const towerTypes = {
 
   devastator: {
     name: "Опустошитель",
-    cost: 3200,
-    unlockWave: 10,
+    cost: 5600,
+    unlockWave: 240,
     color: "#c9504f",
     projectileSpeed: 2400,
     rofK: 168,
@@ -494,8 +496,8 @@ const towerTypes = {
 
   singularity: {
     name: "Нуль-коллайдер",
-    cost: 3500,
-    unlockWave: 18,
+    cost: 6800,
+    unlockWave: 270,
     color: "#eec76a",
     projectileSpeed: 520,
     rofK: 154,
