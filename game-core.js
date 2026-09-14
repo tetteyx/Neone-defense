@@ -4397,8 +4397,13 @@ function drawTowerUpgradeVisual(tower, type) {
     ];
 
     levels.forEach((level, index) => {
-      const progress = (level - 1) / (statMaxLevel(tower.type, kindNames[index]) - 1);
-      if (progress <= 0) {
+      // У продвинутых башен радиус может иметь ОДИН тир (rngTiers:[420] у
+      // «Опустошителя»): (level-1)/(max-1) давал 0/0=NaN, а NaN в строке
+      // цвета бросал SyntaxError в реальном canvas — весь draw() падал в
+      // catch, и вместо карты оставалась служебная сетка (баг v59.11).
+      const maxL = statMaxLevel(tower.type, kindNames[index]);
+      const progress = maxL > 1 ? (level - 1) / (maxL - 1) : 0;
+      if (!(progress > 0)) {
         return;
       }
       const [ox, oy] = offsets[index];
@@ -4911,7 +4916,7 @@ function loadGame() {
     PATH_LENGTH = totalPathLength();
 
     state.money = DEV_INFINITE_MONEY ? TEST_MONEY : (Number.isFinite(save.money) ? save.money : 170);
-    state.lives = Number.isFinite(save.lives) ? save.lives : 12;
+    state.lives = Number.isFinite(save.lives) ? Math.max(0, Math.min(10, save.lives)) : 10;
     state.wave = Number.isFinite(save.wave) ? save.wave : 0;
     state.kills = Number.isFinite(save.kills) ? save.kills : 0;
     state.towers = Array.isArray(save.towers) ? save.towers : [];
