@@ -1282,8 +1282,10 @@ function getWaveScaling(wave) {
   return {
     hp: Math.max(1, hp),
     speed: 45 * speedGrowth * difficulty.speedMultiplier,
-    // Каллибровка под оригинал: награда пропорциональна здоровью (~$5 на w1).
-    reward: Math.max(1, hp * 0.5 * difficulty.rewardMultiplier),
+    // Награда за фраг — как в оригинальном Onslaught: линейно по номеру волны
+    // (моб на волне 1 = $1, на волне 2 = $2, … на волне N = $N). Поздняя
+    // экономика сознательно тугая: копить на продвинутые турели приходится.
+    reward: Math.max(1, w * difficulty.rewardMultiplier),
     count: Math.max(4, Math.round(countGrowth * difficulty.countMultiplier)),
     spawnInterval: Math.max(0.20, 0.72 - Math.min(0.43, (w - 1) * 0.0038))
   };
