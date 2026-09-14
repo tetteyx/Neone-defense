@@ -1,19 +1,22 @@
 /* =========================================================
-   duel.js — «Дуэль волн» (асинхронный мультиплеер v0)
+   duel.js — «Рейтинговый бой» (соревновательный онлайн-режим v0)
+   Вход: кнопка «⚔ Рейтинговый бой» в главном меню -> core.startRankedGame().
+   Отличия боя от обычной партии (реализованы в game-core.js): нет паузы,
+   нет ускорителя x2/x3, вместо «Главное меню» — «Сдаться» (2 клика).
+
    Реальный realtime-PvP на Яндекс.Играх недоступен: у платформы нет
-   сокетов/матчмейкинга, а свои серверы правилами запрещены. Поэтому
-   обмен живётся по LOW-FREQUENCY каналу — таблице лидеров:
+   сокетов/матчмейкинга, а свои серверы правилами запрещены. Поэтому обмен
+   живёт по LOW-FREQUENCY каналу — таблице лидеров:
      · каждые PUSH_MS шлём setScore(value = текущая волна);
-     · каждые POLL_MS читаем getScores ищем выбранного соперника по uniqueId;
+     · каждые POLL_MS читаем getScores ищем соперника по uniqueId;
      · панель показывает его волну и разницу;
    «побеждает тот, кто дожил дольше» — на game over сравниваем финальные
    волны. Волна монотонна, а «лучший результат» в ЛБ = текущая, так что
-   канал работает честно в обе стороны (задержка 5–15 с — это асинхронный
-   формат, как «дуэли» в словесных играх, а не realtime).
-   Вне платформы (git/file://) или при пустой таблице — соперник «призрачный
-   игрок» (бот-гоуст): детерминированная кривая волны; панель это честно
-   подписывает. Код таблицы: window.NEON_DUEL_LB_CODE, иначе — первая из
-   getList().
+   канал работает честно в обе стороны (задержка 5–15 с — асинхронный
+   формат). Код таблицы: window.NEON_DUEL_LB_CODE, иначе — первая из
+   getList(). Вне платформы (git/file://), при пустой таблице или 3
+   ошибках канала — соперник «призрачный игрок» (бот-гоуст); панель честно
+   подписывает режим.
    ========================================================= */
 (function () {
   "use strict";
@@ -22,16 +25,14 @@
   const POLL_MS = 10000;   // как часто читаем соперника
   const RENDER_MS = 900;   // перерисовка панели (и языка)
   const STALE_MS = 45000;  // соперник не двигается — «замолчал»
-  const LS_KEY = "neonDuelOn_v1";
 
   const duel = {
-    enabled: false,
     running: false,
-    mode: "offline",         // "yandex" | "bot"
+    mode: "bot",             // "yandex" | "bot"
     board: null,             // код таблицы лидеров
     myUid: null,
     opponent: null,          // { uid, name, wave, seenAt }
-    bot: null,               // { wave, t, step, final }
+    bot: null,               // { wave, acc, step, final, done }
     myWave: 0,
     result: null,
     pushTimer: null,
@@ -48,15 +49,19 @@
       if (typeof tl === "function") return tl(key, params);
     } catch (e) {}
     const RU = {
-      "ui.duelTitle": "⚔ Дуэль волн",
+      "ui.duelTitle": "⚔ Рейтинговый бой",
       "ui.duelSearching": "Ищем соперника…",
       "ui.duelOnline": "онлайн",
       "ui.duelBot": "призрачный игрок",
-      "ui.duelWin": "Выжили дольше: волна {a} против {b}",
+      "ui.duelLead": "опережаете на {n}",
+      "ui.duelBehind": "отстаёте на {n}",
+      "ui.duelEven": "волна в волну",
+      "ui.duelWin": "Выжили дольше соперника: волна {a} против {b}",
       "ui.duelLose": "Соперник выжил дольше: {b} против {a}",
       "ui.duelDraw": "Одинаковая волна — ничья",
+      "ui.duelSurrendered": "Сдались — соперник побеждает",
     };
-    return (RU[key] || key).replace(/\{(\w)\}/g, (_, k) => params && params[k] != null ? params[k] : `{${k}}`);
+    return (RU[key] || key).replace(/\{(\w)\}/g, (_, k) => (params && params[k] != null ? params[k] : `{${k}}`));
   };
 
   /* ---------------- панель ---------------- */
@@ -91,7 +96,6 @@
   }
 
   function renderPanel() {
-    if (!duel.enabled) return;
     buildPanel();
     if (!duel.panel) return;
     const t = duel.texts;
@@ -130,12 +134,12 @@
   }
 
   function scoreValue(s) {
-    return Math.max(0, Math.round(s && (s.value ?? s.integerValue ?? s.score) || 0));
+    return Math.max(0, Math.round((s && (s.value ?? s.integerValue ?? s.score)) || 0));
   }
 
   async function findOnlineOpponent() {
     const lb = bridgePlayer();
-    if (!lb || typeof lb.getScores !== "function") { duel.mode = "bot"; startBot(); return; }
+    if (!lb || typeof lb.getScores !== "function") { duel.mode = "bot"; startBot(); renderPanel(); return; }
     try {
       if (!duel.board) {
         duel.board = window.NEON_DUEL_LB_CODE || null;
@@ -151,7 +155,7 @@
         .map(r => r && r.score)
         .filter(s => s && scoreValue(s) > 0 && (!duel.myUid || !s.player || s.player.uniqueId !== duel.myUid));
       if (!rows.length) throw new Error("empty board");
-      // «рейтинговость»: берём случайного из ближних по волне к нашей истории
+      // «рейтинговость»: берём случайного из ближних по волне к вершине
       rows.sort((a, b) => scoreValue(b) - scoreValue(a));
       const pool = rows.slice(0, Math.max(3, Math.ceil(rows.length / 2)));
       const pick = pool[Math.floor(Math.random() * pool.length)];
@@ -237,14 +241,15 @@
     duel.pushTimer = duel.pollTimer = duel.renderTimer = null;
   }
 
-  duel.onGameStart = function () {
+  // core вызывает при каждой новой партии; панель нужна только в бою.
+  duel.onGameStart = function (ranked) {
     duel.result = null;
     duel.myWave = 0;
     duel.opponent = null;
     duel.bot = null;
     duel.errors = 0;
     duel.running = false;
-    if (!duel.enabled) { renderPanel(); return; }
+    if (!ranked) { stopTimers(); renderPanel(); return; }
     duel.running = true;
     buildPanel();
     if (bridgePlayer()) findOnlineOpponent();
@@ -257,13 +262,14 @@
     duel.myWave = Math.max(duel.myWave, n || 0);
   };
 
-  duel.onGameOver = function (finalWave) {
+  duel.onGameOver = function (finalWave, surrendered) {
     if (!duel.running) { renderPanel(); return; }
     duel.running = false;
     stopTimers();
     duel.myWave = Math.max(duel.myWave, finalWave || duel.myWave);
     const oppWave = duel.opponent ? duel.opponent.wave : (duel.bot ? duel.bot.wave : 0);
-    if (duel.myWave > oppWave) duel.result = T("ui.duelWin", { a: duel.myWave, b: oppWave });
+    if (surrendered) duel.result = T("ui.duelSurrendered");
+    else if (duel.myWave > oppWave) duel.result = T("ui.duelWin", { a: duel.myWave, b: oppWave });
     else if (duel.myWave < oppWave) duel.result = T("ui.duelLose", { a: duel.myWave, b: oppWave });
     else duel.result = T("ui.duelDraw");
     renderPanel();
@@ -273,23 +279,17 @@
   function buildMenuButton() {
     const startBtn = document.getElementById("startGameBtn");
     if (!startBtn || duel.menuBtn) return;
-    const btn = document.createElement("button");
-    btn.id = "duelToggleBtn";
+    const btn = makeEl("button", "menu-ranked", T("ui.rankedBtn"));
+    btn.id = "rankedBattleBtn";
     btn.type = "button";
-    btn.className = "menu-duel";
+    // Перевод при смене языка: applyDom() i18n.js перезапишет по атрибуту.
+    btn.setAttribute("data-i18n", "ui.rankedBtn");
     btn.addEventListener("click", () => {
-      duel.enabled = !duel.enabled;
-      try { localStorage.setItem(LS_KEY, duel.enabled ? "1" : "0"); } catch (e) {}
-      btn.classList.toggle("active", duel.enabled);
-      btn.setAttribute("aria-pressed", String(duel.enabled));
-      btn.textContent = duel.enabled ? T("ui.duelOn") : T("ui.duelOff");
+      // core.startRankedGame — глобальная функция game-core.js
+      if (typeof startRankedGame === "function") startRankedGame();
     });
     startBtn.insertAdjacentElement("afterend", btn);
     duel.menuBtn = btn;
-    try { duel.enabled = localStorage.getItem(LS_KEY) === "1"; } catch (e) {}
-    btn.classList.toggle("active", duel.enabled);
-    btn.setAttribute("aria-pressed", String(duel.enabled));
-    btn.textContent = duel.enabled ? T("ui.duelOn") : T("ui.duelOff");
   }
 
   if (document.readyState === "loading") {
@@ -298,7 +298,7 @@
     buildMenuButton();
   }
 
-  // Хуки для автотестов (harness.js): прокрутка бота без реальных таймеров.
+  // Хуки для автотестов (harness.js): прокрутка призрака без реальных таймеров.
   duel.testHooks = {
     tick: dt => tickBot(dt),
     render: renderPanel,

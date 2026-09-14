@@ -2972,6 +2972,11 @@ function setPaused(paused) {
 pauseBtn.addEventListener(
     "click",
     () => {
+      // Рейтинговый бой: паузы нет (п. прав. требования к соревновательным
+      // режимам — только системный пауз платформы остаётся).
+      if (state.ranked) {
+        return;
+      }
       ensureAudio();
       setPaused(!state.paused);
     }
@@ -2990,6 +2995,12 @@ if (resumeBtn) {
 speedBtn.addEventListener(
     "click",
     () => {
+      // Рейтинговый бой: ускорителя скорости нет — только x1.
+      if (state.ranked) {
+        state.speed = 1;
+        speedBtn.textContent = "x1";
+        return;
+      }
       if (state.speed === 1) {
         state.speed = 2;
       } else if (state.speed === 2) {
@@ -3112,7 +3123,7 @@ if (nextWaveBtn) {
 
 menuBtn.addEventListener(
     "click",
-    showMainMenu
+    () => { onMenuButton(); }
 );
 
 if (difficultyList) {
@@ -4730,8 +4741,8 @@ function endGame(win) {
 
   state.gameOver = true;
 
-  // Duel.js: подводим итог «кто дожил дольше».
-  try { window.NeonDuel && window.NeonDuel.onGameOver(state.wave); } catch (e) {}
+  // Duel.js: подводим итог «кто дожил дольше»; сдача = поражение.
+  try { window.NeonDuel && window.NeonDuel.onGameOver(state.wave, !!(state.ranked && state.rankedSurrendered)); } catch (e) {}
 
   state.waveActive = false;
   state.spawning = false;
@@ -4739,6 +4750,9 @@ function endGame(win) {
   if (win) {
     endTitle.textContent = tl("end.victoryTitle");
     endText.textContent = tl("end.victoryText", { n: state.maxWaves, k: state.kills });
+  } else if (state.ranked && state.rankedSurrendered) {
+    endTitle.textContent = tl("ranked.surrenderTitle");
+    endText.textContent = tl("ranked.surrenderText", { n: state.wave });
   } else {
     ensureAudio();
     playDefeatSound();
@@ -4969,7 +4983,61 @@ function loadGame() {
   }
 }
 
+/* ---------------- Рейтинговый бой (соревновательный режим duel.js) ----------------
+   Вход — кнопка «⚔ Рейтинговый бой» в главном меню. Отличия от обычной партии:
+   нет кнопки паузы (и она не работает), нет ускорителя x2/x3 (только x1),
+   вместо «← Главное меню» — «🏳 Сдаться» с двухшаговым подтверждением
+   (повторный клик за 4 с). Сдавшийся не сохраняет партию. Панель соперника
+   (дуэль волн через лидерборд/призрака) активна только здесь. */
+let rankedSurrenderTimer = 0;
+
+function setRanked(on) {
+  state.ranked = !!on;
+  state.rankedSurrendered = false;
+  if (rankedSurrenderTimer) {
+    clearTimeout(rankedSurrenderTimer);
+    rankedSurrenderTimer = 0;
+  }
+  gameScreen.classList.toggle("ranked-mode", state.ranked);
+  menuBtn.classList.remove("confirm");
+  menuBtn.classList.toggle("surrender", state.ranked);
+  menuBtn.textContent = state.ranked ? tl("ui.surrender") : tl("ui.mainMenu");
+  if (state.ranked) {
+    state.speed = 1;
+    speedBtn.textContent = "x1";
+    setPaused(false);
+  }
+}
+
+function onMenuButton() {
+  if (!state.ranked || state.gameOver) {
+    showMainMenu();
+    return;
+  }
+  if (rankedSurrenderTimer) {          // второй клик — подтверждение сдачи
+    clearTimeout(rankedSurrenderTimer);
+    rankedSurrenderTimer = 0;
+    menuBtn.classList.remove("confirm");
+    state.rankedSurrendered = true;
+    endGame(false);
+    return;
+  }
+  menuBtn.textContent = tl("ui.surrenderConfirm");
+  menuBtn.classList.add("confirm");
+  rankedSurrenderTimer = setTimeout(() => {
+    rankedSurrenderTimer = 0;
+    menuBtn.classList.remove("confirm");
+    menuBtn.textContent = tl("ui.surrender");
+  }, 4000);
+}
+
+function startRankedGame() {
+  setRanked(true);
+  startNewGame();
+}
+
 function showMainMenu() {
+  setRanked(false);
   // Единственный штатный способ создать сохранение для «Продолжить игру» —
   // выйти из уже начатой активной партии через кнопку главного меню.
   if (hasStartedGame && !state.gameOver && !gameScreen.classList.contains("hidden")) {
@@ -5005,6 +5073,9 @@ function updateDevMoneyButton() {
 }
 
 function startGame() {
+  // Обычная партия (кнопка «Новая игра») никогда не бывает боем; рематч на
+  // финальном экране идёт через startNewGame и сохраняет режим ranked.
+  setRanked(false);
   setGameOverUi(false);
   ensureAudio();
   if (hasSavedGame()) {
@@ -5045,8 +5116,8 @@ function restartGame() {
   state.money = DEV_INFINITE_MONEY ? TEST_MONEY : 300;
   state.lives = 10;
 
-  // Duel.js: новая партия — новый зачёт дуэли.
-  try { window.NeonDuel && window.NeonDuel.onGameStart(); } catch (e) {}
+  // Duel.js: новая партия — новый зачёт дуэли; панель активна только в рейтинге.
+  try { window.NeonDuel && window.NeonDuel.onGameStart(state.ranked === true); } catch (e) {}
 
   state.wave = 0;
   state.kills = 0;
