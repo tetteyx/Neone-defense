@@ -7,15 +7,16 @@
    Реальный realtime-PvP на Яндекс.Играх недоступен (нет сокетов/матчмейкинга,
    свои серверы запрещены), поэтому обмен живёт по LOW-FREQUENCY каналу —
    таблице лидеров современного API ysdk.leaderboards:
-     · score = РЕЙТИНГ (его показывает лидерборд), extraData (строка) = волна
-       — технический канал гонки;
-     · каждые PUSH_MS setScore(name, рейтинг, String(волна)); каждые POLL_MS
+     · score = РЕЙТИНГ (его показывает лидерборд), extraData (строка) = "ВОЛНА:БИТ"
+       — канал гонки. БИТ — счётчик пушей: живая строка меняется каждые PUSH_MS,
+        молчание строки WIN_LOCK_MS = «партию закончил» (умер/сдал/вышел).
+     · каждые PUSH_MS setScore(name, рейтинг, "волна:бит"); каждые POLL_MS
        getEntries ищем соперника по player.uniqueID;
      · панель — пилюля ПО ЦЕНТРУ НАД игровым полем: «вы ⚔ соперник» обеими
        волнами и подписью режима;
-     · ПОБЕДА ЗАСЧИТЫВАЕТСЯ СРАЗУ: как только наша волна обогнала волну
-       соперника и его счёт молчит WIN_LOCK_MS (завершил партию) — +25
-       начисляются немедленно, ещё до нашего game over;
+     · ПОБЕДА ЗАСЧИТЫВАЕТСЯ СРАЗУ: соперник замолчал на финальной волне B,
+       а мы её ЗАКРЫЛИ (наша > B), его строка молчит WIN_LOCK_MS — +25
+       немедленно и зелёный финал (NeonDuelFinish), до нашего game over;
      · на game over — добиваем итог: поражение/сдача = −25, ничья 0; бой с
        «призрачным игроком» (вне платформы/без авторизации/пустой таблицы/
        3 ошибок канала) нерейтингов («бой без рейтинга»);
@@ -32,7 +33,7 @@
   const RENDER_MS = 900;    // перерисовка панели / тик призрака
   const STALE_MS = 45000;   // соперник молчит дольше — гасим индикатор
   const RATING_STEP = 25;   // рейтинг за победу против человека (сдача = −25)
-  const WIN_LOCK_MS = 20000; // тишины в волне соперника = «партию он закончил»
+  const WIN_LOCK_MS = 20000; // тишины в ПУШАХ соперника = «партию он закончил»
 
   const duel = {
     running: false,
@@ -40,7 +41,8 @@
     board: null,             // код таблицы лидеров
     myUid: null,
     opponent: null,          // { uid, name, rating, wave, seenAt }
-    oppLastChange: 0,        // когда волна соперника в последний раз двигалась
+    oppLastChange: 0,        // когда строка соперника менялась в последний раз
+    beat: 0,                 // счётчик своих пушей — heartbeat в extraData
     bot: null,               // { wave, acc, step, final, done }
     myWave: 0,
     result: null,
@@ -270,6 +272,9 @@
     const w = parseInt(e.extraData, 10);
     return Number.isFinite(w) && w >= 0 ? w : null;
   }
+  function extraOf(e) {
+    try { return e && e.extraData != null ? String(e.extraData) : ""; } catch (err) { return ""; }
+  }
   function myRating() {
     try { return window.NeonRating ? window.NeonRating.get() : 0; } catch (e) { return 0; }
   }
@@ -288,15 +293,17 @@
       const res = await api.getEntries(duel.board, { quantityTop: 10, quantityAround: 15, includeUser: true });
       const rows = (res && res.entries || []).filter(e => uidOf(e) && uidOf(e) !== duel.myUid);
       if (!rows.length) throw new Error("empty board");
-      // Матчмейкинг по рейтингу: ближайший к своему значению.
+      // Матчмейкинг по рейтингу: ближайший к своему значению. Строки с
+      // известной волной в приоритете — без extraData бой был бы «невыигрываем».
       const mine = myRating();
       rows.sort((a, b) => Math.abs(ratingOf(a) - mine) - Math.abs(ratingOf(b) - mine));
-      const pick = rows[0];
+      const pick = rows.find(e => waveOf(e) != null) || rows[0];
       duel.opponent = {
         uid: uidOf(pick),
         name: (pick.player && pick.player.publicName) || "—",
         rating: ratingOf(pick),
         wave: waveOf(pick),
+        extraRaw: extraOf(pick),
         seenAt: Date.now(),
       };
       duel.oppLastChange = Date.now();
@@ -311,15 +318,24 @@
   function pollOpponent() {
     if (!duel.board || !duel.opponent) return;
     leaderboardsApi().then(api => {
-      if (!api) return;
+      if (!api || !duel.opponent) return;
       api.getEntries(duel.board, { quantityAround: 30, includeUser: true }).then(res => {
         const row = (res && res.entries || []).find(e => uidOf(e) === duel.opponent.uid);
         if (!row) return;
         const wave = waveOf(row);
         const rating = ratingOf(row);
-        if (wave !== duel.opponent.wave) duel.oppLastChange = Date.now();
+        const raw = extraOf(row);
+        // Heartbeat: живой соперник пишет строку каждые PUSH_MS (бит растёт),
+        // даже сидя на одной длинной волне. Молчание строки = он завершил
+        // партию — именно оно запускает ранний замок, а не отсутствие
+        // движения волны (старая сборка-«тихий» соперник больше не блокирует
+        // победу, а живой на длинной волне — не дарит её нам ложно).
+        if (raw !== duel.opponent.extraRaw || wave !== duel.opponent.wave) {
+          duel.oppLastChange = Date.now();
+          duel.opponent.extraRaw = raw;
+        }
         if (wave !== duel.opponent.wave || rating !== duel.opponent.rating) duel.opponent.seenAt = Date.now();
-        duel.opponent.wave = wave;
+        if (wave != null) duel.opponent.wave = wave; // нет extraData — держим последнюю известную
         duel.opponent.rating = rating;
         duel.errors = 0;
         renderPanel();
@@ -331,7 +347,8 @@
     if (!duel.board) return;
     leaderboardsApi().then(api => {
       if (!api) return;
-      api.setScore(duel.board, myRating(), String(Math.max(0, duel.myWave | 0))).then(() => {
+      // extraData = "волна:бит" — бит меняется КАЖДЫМ пушем (heartbeat канала).
+      api.setScore(duel.board, myRating(), (Math.max(0, duel.myWave | 0)) + ":" + (++duel.beat)).then(() => {
         duel.errors = 0;
       }).catch(() => {
         if (++duel.errors >= 3) { duel.mode = "bot"; duel.opponent = null; startBot(); }
@@ -490,5 +507,6 @@
     // и его волна: setter без живого лидерборда.
     silence: () => { duel.oppLastChange = 0; },
     oppWave: n => { if (duel.opponent) { duel.opponent.wave = n; duel.oppLastChange = Date.now(); } },
+    poll: () => pollOpponent(), // один читок таблицы (для теста heartbeat)
   };
 })();
