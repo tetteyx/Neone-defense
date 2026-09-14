@@ -4861,9 +4861,20 @@ function endGame(win) {
         : outcome === "draw" ? tl("ranked.drawTitle")
         : (state.rankedSurrendered ? tl("ranked.surrenderTitle") : tl("ranked.loseTitle"));
       const ratingLine = tl("ranked.ratingLine", { n: rating }) + (delta ? " (" + (delta > 0 ? "+" : "") + delta + ")" : "");
+      // Строка о сопернике — видно, с кем и по какой волне считался итог:
+      // «призрак» = бой без рейтинга; «волны не видны» = на лидерборде
+      // выключено дополнительное поле (чинится в Консоли).
+      let oppLine = "";
+      if (du && du.mode === "yandex") {
+        oppLine = "\n" + (du.extraEmpty
+          ? tl("ranked.wavesHidden")
+          : tl("ranked.oppLine", { n: (du.opponent && du.opponent.name) || "—", b: du.opponent && du.opponent.wave != null ? du.opponent.wave : "?" }));
+      } else if (du && du.mode === "bot") {
+        oppLine = "\n" + tl("ranked.ghostLine");
+      }
       endText.textContent = (state.rankedSurrendered
         ? tl("ranked.surrenderText", { n: state.wave })
-        : tl("ranked.waveText", { n: state.wave })) + "\n" + ratingLine;
+        : tl("ranked.waveText", { n: state.wave })) + "\n" + ratingLine + oppLine;
       if (outcome !== "win") {
         ensureAudio();
         playDefeatSound();

@@ -34,6 +34,8 @@
   const STALE_MS = 45000;   // соперник молчит дольше — гасим индикатор
   const RATING_STEP = 25;   // рейтинг за победу против человека (сдача = −25)
   const WIN_LOCK_MS = 20000; // тишины в ПУШАХ соперника = «партию он закончил»
+  const BUILD = "59.23";     // номер сборки: виден в меню — сверка с тем, что
+                             // реально загрузилось на площадку (v59.23+)
 
   const duel = {
     running: false,
@@ -43,6 +45,8 @@
     opponent: null,          // { uid, name, rating, wave, seenAt }
     oppLastChange: 0,        // когда строка соперника менялась в последний раз
     beat: 0,                 // счётчик своих пушей — heartbeat в extraData
+    extraSeen: false,        // сервер вернул непустой extraData (доп. поле таблицы живо)
+    extraEmpty: false,       // мы пушим, а extraData пустой везде → волны не видны
     bot: null,               // { wave, acc, step, final, done }
     myWave: 0,
     result: null,
@@ -76,6 +80,7 @@
       "ui.duelEven": "волна в волну",
       "ui.duelWin": "Выжили дольше соперника: волна {a} против {b}",
       "ui.duelWinLocked": "Победа! Соперник завершил бой на волне {b}",
+      "ui.duelNoExtra": "нет доп. поля в таблице",
       "ui.duelLose": "Соперник выжил дольше: {b} против {a}",
       "ui.duelDraw": "Одинаковая волна — ничья",
       "ui.duelSurrendered": "Сдались — соперник побеждает",
@@ -168,14 +173,21 @@
   }
   function checkEarlyWin() {
     if (!duel.running || duel.result || duel.wonEarly) return;
-    if (duel.mode !== "yandex" || !duel.opponent || duel.opponent.wave == null) return;
-    if (duel.myWave <= duel.opponent.wave) return;
-    if (Date.now() - duel.oppLastChange < WIN_LOCK_MS) return;
-    // Соперник молчит на своей финальной волне, а мы её пережили — победа.
+    // v59.23: «победа по волнам» не ждёт нашей смерти и в бою с призраком:
+    // призрак добежал до финальной волны (done), а мы её пережили — тот же
+    // немедленный зелёный финал, только без рейтинга (бой нерейтингов).
+    if (duel.mode === "bot") {
+      const b = duel.bot;
+      if (!b || !b.done || duel.myWave <= b.wave) return;
+    } else {
+      if (duel.mode !== "yandex" || !duel.opponent || duel.opponent.wave == null) return;
+      if (duel.myWave <= duel.opponent.wave) return;
+      if (Date.now() - duel.oppLastChange < WIN_LOCK_MS) return;
+    }
     duel.wonEarly = true;
     duel.duelOutcome = "win";
-    duel.result = T("ui.duelWinLocked", { b: duel.opponent.wave });
-    applyRating(RATING_STEP);
+    duel.result = T("ui.duelWinLocked", { b: duel.mode === "bot" ? duel.bot.wave : duel.opponent.wave });
+    if (duel.mode === "yandex") applyRating(RATING_STEP);
     // v59.19: бой не ждут до своей смерти — партия завершается СРАЗУ,
     // экран финала зелёный (core: NeonDuelFinish -> endGame).
     try { window.NeonDuelFinish && window.NeonDuelFinish(); } catch (e) {}
@@ -220,7 +232,8 @@
     duel.panel.classList.toggle("is-stale", !!stale && !duel.result);
     duel.panel.classList.toggle("has-result", !!duel.result && !duel.wonEarly);
     duel.panel.classList.toggle("is-won", !!duel.result && duel.wonEarly);
-    t.label.textContent = duel.result ? duel.result : deltaText;
+    const warn = duel.extraEmpty && duel.mode === "yandex" && !duel.result ? " · " + T("ui.duelNoExtra") : "";
+    t.label.textContent = (duel.result ? duel.result : deltaText) + warn;
     positionPanel();
   }
 
@@ -252,6 +265,9 @@
       }
       return null;
     })();
+    // Не липнем к null: лидерборды SDK могут появиться позже бутстрапа.
+    // Как только api получен — держим его; получен null — даём следующий шанс.
+    lbApiPromise.then(v => { if (!v) lbApiPromise = null; });
     return lbApiPromise;
   }
   function duelAuthorized() {
@@ -325,6 +341,15 @@
         const wave = waveOf(row);
         const rating = ratingOf(row);
         const raw = extraOf(row);
+        // Диагностика канала: мы уже пушнули бит, а сервер возвращает пустой
+        // extraData в СОБСТВЕННОЙ строке → на лидерборде выключено «доп.
+        // поле» — волны не видны ни у кого, досрочную победу не посчитать.
+        if (!duel.extraSeen && duel.beat > 0) {
+          const me = (res && res.entries || []).find(e => uidOf(e) === duel.myUid);
+          if (me && extraOf(me) !== "") duel.extraSeen = true;
+          if (raw !== "") duel.extraSeen = true;
+        }
+        duel.extraEmpty = duel.beat > 0 && !duel.extraSeen;
         // Heartbeat: живой соперник пишет строку каждые PUSH_MS (бит растёт),
         // даже сидя на одной длинной волне. Молчание строки = он завершил
         // партию — именно оно запускает ранний замок, а не отсутствие
@@ -409,6 +434,8 @@
     duel.lastDelta = 0;
     duel.wonEarly = false;
     duel.duelOutcome = null;
+    duel.extraSeen = false;
+    duel.extraEmpty = false;
     duel.ratingApplied = false;
     duel.errors = 0;
     duel.running = false;
@@ -488,6 +515,11 @@
     });
     startBtn.insertAdjacentElement("afterend", btn);
     duel.menuBtn = btn;
+    try {
+      const tag = makeEl("small", "duel-build", "v" + BUILD);
+      tag.title = "Neon Bridge Defense · build v" + BUILD;
+      btn.insertAdjacentElement("afterend", tag);
+    } catch (e) {}
   }
 
   if (document.readyState === "loading") {
@@ -508,5 +540,6 @@
     silence: () => { duel.oppLastChange = 0; },
     oppWave: n => { if (duel.opponent) { duel.opponent.wave = n; duel.oppLastChange = Date.now(); } },
     poll: () => pollOpponent(), // один читок таблицы (для теста heartbeat)
+    botFinish: () => { if (duel.bot) { duel.bot.wave = duel.bot.final; duel.bot.done = true; } },
   };
 })();
