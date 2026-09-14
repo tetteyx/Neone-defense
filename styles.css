@@ -602,24 +602,29 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 }
 .tower-list::-webkit-scrollbar,.boost-list::-webkit-scrollbar{width:6px}
 .tower-list::-webkit-scrollbar-thumb,.boost-list::-webkit-scrollbar-thumb{background:rgba(238,241,247,.14);border-radius:999px;border:0}
-/* ── v59.13 «Рейтинговый бой» (duel.js): панель соперника над ареной + кнопка меню + боевой HUD ── */
-.duel-panel{position:absolute;top:12px;left:12px;z-index:6;min-width:168px;padding:9px 12px;border-radius:12px;background:rgba(21,26,43,.86);border:1px solid rgba(143,208,232,.28);color:#eef1f7;font-size:13px;line-height:1.35;pointer-events:none;display:none}
-.duel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.duel-title{color:#8fd0e8;font-weight:700;letter-spacing:.3px}
-.duel-mode{opacity:.55;font-size:11px}
-.duel-body{display:flex;align-items:center;gap:8px;margin-top:5px}
-.duel-opp-name{opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px}
-.duel-opp-wave{margin-left:auto;font-size:19px;font-weight:800;color:#e8b64c}
-.duel-foot{margin-top:3px;opacity:.75;font-size:12px}
-.duel-dot{width:8px;height:8px;border-radius:50%;background:#74c476;box-shadow:0 0 6px rgba(116,196,118,.8);animation:duelPulse 2.2s ease-in-out infinite}
-.duel-panel.is-losing .duel-dot{background:#df6a5f;box-shadow:0 0 6px rgba(223,106,95,.8);animation-duration:1.1s}
+/* ── v59.14 «Рейтинговый бой» (duel.js): панель на дизайн-токенах игры ──
+   Шрифты как в HUD: заголовок — display (как h1/h2 секций), число волны —
+   mono 800 tabular (как .life-count/#wave), служебные подписи — mono caps
+   (как .status-strip small). Позицию left/top задаёт JS по канвасу. */
+.duel-panel{position:absolute;top:6px;left:6px;z-index:6;min-width:172px;padding:9px 13px;border-radius:14px;background:var(--cm-bg);border:1px solid var(--cm-line);box-shadow:var(--cm-raised-shadow);color:var(--cm-cream);font-family:var(--cm-font-body);font-size:.8rem;line-height:1.4;pointer-events:none;display:none}
+.duel-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.duel-title{font-family:var(--cm-font-display);font-weight:600;letter-spacing:-.01em;color:var(--cm-cream);font-size:.86rem}
+.duel-mode{font-family:var(--cm-font-mono);font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--cm-muted)}
+.duel-body{display:flex;align-items:center;gap:9px;margin-top:5px}
+.duel-opp-name{font-family:var(--cm-font-body);color:var(--cm-cream);opacity:.72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:92px}
+.duel-opp-wave{margin-left:auto;font-family:var(--cm-font-mono);font-weight:800;font-size:1.15rem;color:var(--cm-gold);font-variant-numeric:tabular-nums}
+.duel-foot{margin-top:3px}
+.duel-delta{font-family:var(--cm-font-mono);font-size:.62rem;letter-spacing:.04em;color:var(--cm-muted)}
+.duel-panel.is-losing .duel-delta{color:var(--cm-coral)}
+.duel-dot{width:7px;height:7px;border-radius:50%;background:var(--cm-leaf);box-shadow:0 0 6px rgba(116,196,118,.8);animation:duelPulse 2.2s ease-in-out infinite}
+.duel-panel.is-losing .duel-dot{background:var(--cm-coral);box-shadow:0 0 6px rgba(223,106,95,.8);animation-duration:1.1s}
 .duel-panel.is-stale .duel-dot{opacity:.3;animation:none;box-shadow:none}
-.duel-panel.has-result{border-color:rgba(223,106,95,.65)}
-.menu-ranked{grid-column:1/-1;justify-self:center;width:max-content;margin:8px auto 0;min-height:36px;padding:0 16px;border-radius:10px;background:rgba(232,182,76,.1);color:#e8b64c;border:1px solid rgba(232,182,76,.42);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px}
-.menu-ranked:hover{background:rgba(232,182,76,.18)}
+.duel-panel.has-result{border-color:rgba(223,106,95,.55)}
+.menu-ranked{grid-column:1/-1;justify-self:center;display:inline-block;margin:6px auto 0;min-height:36px;padding:8px 20px;border:1px solid rgba(232,182,76,.5);border-radius:999px;background:rgba(232,182,76,.08);color:var(--cm-gold);font-family:var(--cm-font-mono);font-weight:800;font-size:.78rem;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;transition:background .15s ease,transform .15s ease}
+.menu-ranked:hover{background:rgba(232,182,76,.18);transform:translateY(-1px)}
 /* Боевой HUD: в рейтинговом бою — ни паузы, ни ускорителя; кнопка выхода -> «Сдаться» */
 .ranked-mode #pauseBtn,.ranked-mode #speedBtn{display:none!important}
-.ranked-mode #menuBtn.surrender{color:#df6a5f;border-color:rgba(223,106,95,.5)}
+.ranked-mode #menuBtn.surrender{color:var(--cm-coral);border-color:rgba(223,106,95,.5)}
 .ranked-mode #menuBtn.surrender.confirm{background:rgba(223,106,95,.16);color:#ffb3ab;animation:duelPulse 1.1s ease-in-out infinite}
 @keyframes duelPulse{0%,100%{opacity:1}50%{opacity:.35}}
 

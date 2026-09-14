@@ -71,6 +71,24 @@ body {
   grid-template-rows: minmax(clamp(84px, 13vh, 150px), 1fr) auto;
 }
 
+/* Кастомные карты: со «Своей картой» сетка вырастает до двух рядов и в
+   фиксированном 100dvh окне Яндекса второй ряд обрезался — скролл вместо
+   клиппинга (v59.14). */
+.map-list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.map-list::-webkit-scrollbar { width: 8px; }
+.map-list::-webkit-scrollbar-thumb { background: rgba(238,241,247,.14); border-radius: 999px; }
+
+/* Панель рейтингового боя на телефоне компактнее: не закрывать поле. */
+@media (max-width: 700px) {
+  .duel-panel { min-width: 0; padding: 6px 9px; font-size: 11px; }
+  .duel-opp-wave { font-size: 15px; }
+}
+
 .map-preview {
   min-height: clamp(84px, 13vh, 150px);
 }

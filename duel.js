@@ -71,6 +71,19 @@
     if (text != null) e.textContent = text;
     return e;
   }
+  // В яндекс-оболочке канвас центрируется внутри .arena-wrap (place-items:center),
+  // поэтому панель обязана привязываться к ФАКТИЧЕСКОМУ прямоуголю поля, а не к
+  // углу обёртки — иначе она «съезжает» в чёрные поля по бокам канваса (v59.14).
+  function positionPanel() {
+    if (!duel.panel) return;
+    const canvas = document.getElementById("game");
+    if (!canvas) return;
+    const left = Math.max(6, (canvas.offsetLeft | 0) + 6);
+    const top = Math.max(6, (canvas.offsetTop | 0) + 6);
+    if (duel.panel._pl !== left) duel.panel.style.left = (duel.panel._pl = left) + "px";
+    if (duel.panel._pt !== top) duel.panel.style.top = (duel.panel._pt = top) + "px";
+  }
+  window.addEventListener("resize", positionPanel);
   function buildPanel() {
     const arena = document.querySelector(".arena-wrap");
     if (!arena || duel.panel) return;
@@ -98,6 +111,7 @@
   function renderPanel() {
     buildPanel();
     if (!duel.panel) return;
+    positionPanel();
     const t = duel.texts;
     duel.panel.style.display = duel.running || duel.result ? "block" : "none";
     if (!duel.running && !duel.result) return;
